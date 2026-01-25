@@ -1,0 +1,6 @@
+venv/Lib/site-packages/absl/flags/__pycache__/_helpers.cpython-313.pyc
+venv/
+venv310/
+db/
+enroll/
+*.onnx
