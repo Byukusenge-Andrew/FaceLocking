@@ -21,6 +21,10 @@ import numpy as np
 
 try:
     import mediapipe as mp
+    from mediapipe import solutions as mp_solutions
+    # Ensure mp.solutions is available if it wasn't attached
+    if not hasattr(mp, "solutions"):
+        mp.solutions = mp_solutions
 except Exception as e:
     mp = None
     _MP_IMPORT_ERROR = e
@@ -320,6 +324,67 @@ class Haar5ptDetector:
                 kps=kps_s.astype(np.float32),
             )
         ][:max_faces]
+
+    def detect_with_mesh(self, frame_bgr: np.ndarray, max_faces: int = 1) -> Tuple[List[FaceKpsBox], Optional[any]]:
+        """
+        Returns (faces, mesh_results) where mesh_results is the raw mediapipe output
+        for the LAST successful detection (simplified).  Use with care for single-face tracking.
+        """
+        H, W = frame_bgr.shape[:2]
+        gray = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2GRAY)
+
+        faces = self._haar_faces(gray)
+        if faces.shape[0] == 0:
+            return [], None
+
+        areas = faces[:, 2] * faces[:, 3]
+        i = int(np.argmax(areas))
+        x, y, w, h = faces[i].tolist()
+
+        # Run FaceMesh on the whole image (slow but robust) or ROI?
+        # The original code runs on full RGB.
+        rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
+        res = self.mp_face_mesh.process(rgb)
+        
+        if not res.multi_face_landmarks:
+             return [], None
+        
+        # We only really care about the 5pt extraction logic for the box, 
+        # but we want to return the 'res' object so our caller can compute EAR/MAR.
+        
+        # ... logic from _facemesh_5pt but reused ...
+        lm = res.multi_face_landmarks[0].landmark
+        
+        idxs = [self.IDX_LEFT_EYE, self.IDX_RIGHT_EYE, self.IDX_NOSE_TIP, self.IDX_MOUTH_LEFT, self.IDX_MOUTH_RIGHT]
+        pts = [[lm[j].x * W, lm[j].y * H] for j in idxs]
+        kps = np.array(pts, dtype=np.float32)
+        
+        if kps[0, 0] > kps[1, 0]: kps[[0, 1]] = kps[[1, 0]]
+        if kps[3, 0] > kps[4, 0]: kps[[3, 4]] = kps[[4, 3]]
+        
+        # Consistency check logic (simplified from detect)
+        margin = 0.35
+        x1m, y1m = x - margin * w, y - margin * h
+        x2m, y2m = x + (1.0 + margin) * w, y + (1.0 + margin) * h
+        
+        inside = ((kps[:, 0] >= x1m) & (kps[:, 0] <= x2m) & (kps[:, 1] >= y1m) & (kps[:, 1] <= y2m))
+        if inside.mean() < 0.60:
+             return [], None
+             
+        if not _kps_span_ok(kps, min_eye_dist=max(10.0, 0.18 * w)):
+             return [], None
+
+        box = _bbox_from_5pt(kps, pad_x=0.55, pad_y_top=0.85, pad_y_bot=1.15)
+        box = _clip_box_xyxy(box, W, H)
+        
+        # No smoothing in this specific "raw" access method for now, or just return basic box
+        x1, y1, x2, y2 = box.tolist()
+        
+        fb = FaceKpsBox(
+            x1=int(round(x1)), y1=int(round(y1)), x2=int(round(x2)), y2=int(round(y2)),
+            score=1.0, kps=kps.astype(np.float32)
+        )
+        return [fb], res
 
 
 # -------------------------

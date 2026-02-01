@@ -30,6 +30,9 @@ import onnxruntime as ort
 
 try:
     import mediapipe as mp
+    from mediapipe import solutions as mp_solutions
+    if not hasattr(mp, "solutions"):
+        mp.solutions = mp_solutions
 except Exception as e:
     mp = None
     _MP_IMPORT_ERROR = e

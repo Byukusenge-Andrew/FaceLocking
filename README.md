@@ -26,6 +26,7 @@ The system is designed to be understandable, debuggable, reproducible, and runna
   - [2. Enrollment](#2-enrollment)
   - [3. Threshold Evaluation](#3-threshold-evaluation)
   - [4. Live Recognition](#4-live-recognition)
+  - [5. Face Locking](#5-face-locking)
 - [Key Concepts](#key-concepts)
 - [Troubleshooting](#troubleshooting)
 - [Acknowledgments](#acknowledgments)
@@ -50,6 +51,7 @@ The system emphasizes **CPU execution**, **reproducibility**, and **explainabili
 - Enrollment with auto-capture and existing crop re-use
 - Real-time multi-face recognition
 - Threshold tuning based on genuine/impostor distances
+- **Face Locking & Action Detection**: Lock onto a specific identity and track their face, detecting blinks, smiles, and movements.
 
 ## Project Structure
 
@@ -69,7 +71,41 @@ face-recognition-5pt/
 │   ├── enroll.py         # Enroll identities
 │   ├── evaluate.py       # Threshold tuning
 │   ├── haar_5pt.py       # Core: Haar + MediaPipe 5pt detector
-│   └── recognize.py      # Real-time recognition
+│   ├── recognize.py      # Real-time recognition
+│   └── face_locking.py   # Face Locking & Action Detection (Assignments)
 ├── init_project.py       # Creates folder structure
 ├── README.md
 └── .gitignore
+```
+
+## Quick Start
+1. Install requirements:
+   ```bash
+   pip install -r requirements.txt
+   ```
+2. Initialize project (if needed):
+   ```bash
+   python init_project.py
+   ```
+3. Enroll a user:
+   ```bash
+   python -m src.enroll
+   ```
+4. Run Face Locking:
+   ```bash
+   python -m src.face_locking --name [YOUR_NAME]
+   ```
+
+## Face Locking
+The new Face Locking feature (`src/face_locking.py`) allows you to track a single enrolled identity continuously.
+
+**How it works:**
+1.  **Search**: The system looks for the user using ArcFace recognition.
+2.  **Lock**: Once found, it tracks the user's face position.
+3.  **Action Detection**: It measures facial landmarks to detect:
+    - **Blinks**: Using Eye Aspect Ratio (EAR).
+    - **Smiles**: Using mouth width ratios.
+    - **Movement**: Using nose position (Left/Right).
+
+**History**:
+A file named `<name>_history_<timestamp>.txt` is created to record all detected actions.

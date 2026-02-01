@@ -1,6 +1,6 @@
-mediapipe          0.10.14
-numpy              1.26.x
-onnxruntime        1.18.x or higher
-opencv-python      4.10.x or higher
-scipy              1.13.x or higher
-tqdm               4.66.x or higher
+mediapipe         
+numpy            
+onnxruntime       
+opencv-python      
+scipy             
+tqdm               
