@@ -166,9 +166,44 @@ class FaceLockSystem:
 
         faces, mp_res = self.det.detect_with_mesh(frame, max_faces=5)
 
+        # 1. Process all faces to find matches
+        # We want to identify everyone, but only "lock" on the target.
+        target_face = None
+        target_sim = 0.0
+
         for f in faces:
+            # Default gray box for unknown/processing
             cv2.rectangle(vis, (f.x1, f.y1), (f.x2, f.y2), (100, 100, 100), 1)
 
+            aligned, _ = align_face_5pt(frame, f.kps, out_size=(112, 112))
+            emb = embedder.embed(aligned)
+            mr = self.matcher.match(emb)
+
+            if mr.accepted:
+                # It is a known person
+                is_target = (mr.name == self.target_name)
+                
+                if is_target:
+                    # Keep track of the best target candidate
+                    if mr.similarity > target_sim:
+                        target_sim = mr.similarity
+                        target_face = f
+                else:
+                    # Just label other known people immediately
+                    cv2.rectangle(vis, (f.x1, f.y1), (f.x2, f.y2), (255, 200, 0), 2) # Cyan/Gold
+                    cv2.putText(
+                        vis,
+                        mr.name,
+                        (f.x1, f.y1 - 10),
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        0.6,
+                        (255, 200, 0),
+                        2
+                    )
+
+        # 2. State Machine Logic for Target
+        
+        # Handle state transitions based on whether target was found this frame
         if self.state == LockState.SEARCHING:
             cv2.putText(
                 vis,
@@ -180,63 +215,33 @@ class FaceLockSystem:
                 2
             )
 
-            best_face = None
-            best_sim = 0.0
-
-            for f in faces:
-                aligned, _ = align_face_5pt(frame, f.kps, out_size=(112, 112))
-                emb = embedder.embed(aligned)
-                mr = self.matcher.match(emb)
-
-                if mr.accepted and mr.name == self.target_name:
-                    if mr.similarity > best_sim:
-                        best_sim = mr.similarity
-                        best_face = f
-
-            if best_face is not None:
+            if target_face is not None:
                 self.state = LockState.LOCKED
                 self.lost_frames = 0
-                self.log_action("LOCK_ACQUIRED", f"sim={best_sim:.2f}")
+                self.log_action("LOCK_ACQUIRED", f"sim={target_sim:.2f}")
 
-        elif self.state == LockState.LOCKED:
-            cv2.putText(
-                vis,
-                f"LOCKED: {self.target_name}",
-                (10, 30),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.8,
-                (0, 255, 0),
-                2
-            )
-
-            best_face = None
-            best_sim = 0.0
-
-            for f in faces:
-                aligned, _ = align_face_5pt(frame, f.kps, out_size=(112, 112))
-                emb = embedder.embed(aligned)
-                mr = self.matcher.match(emb)
-
-                if mr.accepted and mr.name == self.target_name:
-                    if mr.similarity > best_sim:
-                        best_sim = mr.similarity
-                        best_face = f
-
-            if best_face is not None:
+        # Note: If we just transitioned to LOCKED, we fall through to this block if we use 'if' 
+        # But usually we wait for next frame or handle it now. 
+        # Let's handle it now (or next frame). The original code used elif, so it waited.
+        # Let's use 'if' so we immediately start tracking if found.
+        if self.state == LockState.LOCKED:
+            if target_face is not None:
                 self.lost_frames = 0
-                f = best_face
-
+                f = target_face
+                
+                # Highlight Target
                 cv2.rectangle(vis, (f.x1, f.y1), (f.x2, f.y2), (0, 255, 0), 3)
                 cv2.putText(
                     vis,
-                    "TARGET",
+                    f"TARGET: {self.target_name}",
                     (f.x1, f.y1 - 10),
                     cv2.FONT_HERSHEY_SIMPLEX,
                     0.6,
                     (0, 255, 0),
                     2
                 )
-
+                
+                # Action Detection on Target
                 if mp_res and mp_res.multi_face_landmarks:
                     fw_x, fw_y = (f.x1 + f.x2) / 2, (f.y1 + f.y2) / 2
                     best_lm = None
@@ -264,9 +269,18 @@ class FaceLockSystem:
                                 (0, 255, 255),
                                 2
                             )
-
             else:
+                # Target not found this frame
                 self.lost_frames += 1
+                cv2.putText(
+                    vis,
+                    f"LOCKED: {self.target_name}", # Header matches
+                    (10, 30),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.8,
+                    (0, 255, 0),
+                    2
+                )
                 cv2.putText(
                     vis,
                     f"LOST ({self.lost_frames}/{self.MAX_LOST_FRAMES})",
