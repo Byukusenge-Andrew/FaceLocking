@@ -1,0 +1,17 @@
+07:46:05 | LOCK_ACQUIRED | sim=0.72
+07:46:05 | MOVE_RIGHT | nose_x=0.50
+07:46:06 | MOVE_RIGHT | nose_x=0.55
+07:46:07 | MOVE_RIGHT | nose_x=0.56
+07:46:08 | MOVE_RIGHT | nose_x=0.57
+07:46:09 | MOVE_LEFT | nose_x=0.62
+07:46:10 | MOVE_LEFT | nose_x=0.65
+07:46:11 | MOVE_RIGHT | nose_x=0.55
+07:46:12 | MOVE_RIGHT | nose_x=0.52
+07:46:13 | MOVE_RIGHT | nose_x=0.58
+07:46:14 | MOVE_RIGHT | nose_x=0.58
+07:46:15 | MOVE_RIGHT | nose_x=0.56
+07:46:17 | MOVE_RIGHT | nose_x=0.56
+07:46:18 | MOVE_RIGHT | nose_x=0.56
+07:46:20 | MOVE_RIGHT | nose_x=0.54
+07:46:22 | MOVE_RIGHT | nose_x=0.58
+07:46:24 | MOVE_RIGHT | nose_x=0.52

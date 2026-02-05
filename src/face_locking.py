@@ -106,7 +106,7 @@ class FaceActionDetector:
         # 3. Head Movement (Left/Right)
         # Check nose x relative to frame center (0.5 in normalized coords)
         nose = coords[self.P_NOSE_TIP]
-        if nose[0] < 0.40:
+        if nose[0] < 0.50:
              actions.append(("MOVE_RIGHT", f"nose_x={nose[0]:.2f}"))
         elif nose[0] > 0.60:
              actions.append(("MOVE_LEFT", f"nose_x={nose[0]:.2f}"))

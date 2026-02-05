@@ -1,0 +1,43 @@
+21:34:35 | LOCK_ACQUIRED | sim=0.69
+21:34:36 | MOVE_LEFT | nose_x=0.60
+21:34:38 | SMILE | ratio=0.45
+21:34:39 | SMILE | ratio=0.46
+21:34:40 | LOCK_LOST | Frames without target > 10
+21:34:40 | LOCK_ACQUIRED | sim=0.69
+21:34:41 | SMILE | ratio=0.46
+21:34:41 | LOCK_LOST | Frames without target > 10
+21:34:43 | LOCK_ACQUIRED | sim=0.70
+21:34:43 | SMILE | ratio=0.49
+21:34:45 | LOCK_LOST | Frames without target > 10
+21:34:45 | LOCK_ACQUIRED | sim=0.76
+21:34:52 | SMILE | ratio=0.46
+21:34:53 | SMILE | ratio=0.45
+21:34:56 | SMILE | ratio=0.46
+21:34:57 | SMILE | ratio=0.46
+21:34:58 | SMILE | ratio=0.46
+21:34:59 | BLINK | EAR=0.18
+21:34:59 | SMILE | ratio=0.46
+21:34:59 | MOVE_LEFT | nose_x=0.61
+21:35:00 | SMILE | ratio=0.46
+21:35:00 | MOVE_LEFT | nose_x=0.61
+21:35:00 | SMILE | ratio=0.45
+21:35:01 | SMILE | ratio=0.47
+21:35:01 | MOVE_LEFT | nose_x=0.61
+21:35:01 | SMILE | ratio=0.46
+21:35:01 | MOVE_LEFT | nose_x=0.61
+21:35:02 | SMILE | ratio=0.47
+21:35:02 | MOVE_LEFT | nose_x=0.61
+21:35:02 | SMILE | ratio=0.47
+21:35:03 | SMILE | ratio=0.48
+21:35:04 | SMILE | ratio=0.52
+21:35:05 | SMILE | ratio=0.50
+21:35:08 | SMILE | ratio=0.45
+21:35:09 | LOCK_LOST | Frames without target > 10
+21:35:11 | LOCK_ACQUIRED | sim=0.76
+21:35:17 | SMILE | ratio=0.46
+21:35:18 | SMILE | ratio=0.45
+21:35:25 | BLINK | EAR=0.15
+21:35:27 | MOVE_LEFT | nose_x=0.60
+21:35:28 | MOVE_LEFT | nose_x=0.61
+21:35:29 | MOVE_LEFT | nose_x=0.67
+21:35:30 | MOVE_LEFT | nose_x=0.62
