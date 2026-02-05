@@ -1,0 +1,5 @@
+09:30:03 | LOCK_ACQUIRED | sim=0.73
+09:30:03 | LOCK_LOST | Frames without target > 10
+09:30:09 | LOCK_ACQUIRED | sim=0.70
+09:30:09 | MOVE_RIGHT | nose_x=0.45
+09:30:10 | LOCK_LOST | Frames without target > 10

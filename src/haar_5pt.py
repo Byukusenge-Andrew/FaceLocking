@@ -198,7 +198,7 @@ class Haar5ptDetector:
 
         self.mp_face_mesh = mp.solutions.face_mesh.FaceMesh(
             static_image_mode=False,
-            max_num_faces=1,
+            max_num_faces=10,
             refine_landmarks=True,
             min_detection_confidence=0.5,
             min_tracking_confidence=0.5,
@@ -327,64 +327,68 @@ class Haar5ptDetector:
 
     def detect_with_mesh(self, frame_bgr: np.ndarray, max_faces: int = 1) -> Tuple[List[FaceKpsBox], Optional[any]]:
         """
-        Returns (faces, mesh_results) where mesh_results is the raw mediapipe output
-        for the LAST successful detection (simplified).  Use with care for single-face tracking.
+        Returns (faces, mesh_results). Iterates over all FaceMesh detections.
+        Haar validation is disabled to ensure robust multi-face detection even if Haar fails.
         """
         H, W = frame_bgr.shape[:2]
         gray = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2GRAY)
 
-        faces = self._haar_faces(gray)
-        if faces.shape[0] == 0:
-            return [], None
+        # haar_faces = self._haar_faces(gray)
+        # if haar_faces.shape[0] == 0:
+        #     return [], None
 
-        areas = faces[:, 2] * faces[:, 3]
-        i = int(np.argmax(areas))
-        x, y, w, h = faces[i].tolist()
-
-        # Run FaceMesh on the whole image (slow but robust) or ROI?
-        # The original code runs on full RGB.
+        # Run FaceMesh on the whole image
         rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
         res = self.mp_face_mesh.process(rgb)
         
         if not res.multi_face_landmarks:
              return [], None
         
-        # We only really care about the 5pt extraction logic for the box, 
-        # but we want to return the 'res' object so our caller can compute EAR/MAR.
+        results = []
         
-        # ... logic from _facemesh_5pt but reused ...
-        lm = res.multi_face_landmarks[0].landmark
-        
-        idxs = [self.IDX_LEFT_EYE, self.IDX_RIGHT_EYE, self.IDX_NOSE_TIP, self.IDX_MOUTH_LEFT, self.IDX_MOUTH_RIGHT]
-        pts = [[lm[j].x * W, lm[j].y * H] for j in idxs]
-        kps = np.array(pts, dtype=np.float32)
-        
-        if kps[0, 0] > kps[1, 0]: kps[[0, 1]] = kps[[1, 0]]
-        if kps[3, 0] > kps[4, 0]: kps[[3, 4]] = kps[[4, 3]]
-        
-        # Consistency check logic (simplified from detect)
-        margin = 0.35
-        x1m, y1m = x - margin * w, y - margin * h
-        x2m, y2m = x + (1.0 + margin) * w, y + (1.0 + margin) * h
-        
-        inside = ((kps[:, 0] >= x1m) & (kps[:, 0] <= x2m) & (kps[:, 1] >= y1m) & (kps[:, 1] <= y2m))
-        if inside.mean() < 0.60:
-             return [], None
-             
-        if not _kps_span_ok(kps, min_eye_dist=max(10.0, 0.18 * w)):
-             return [], None
+        for lm_list in res.multi_face_landmarks:
+            lm = lm_list.landmark
+            
+            idxs = [self.IDX_LEFT_EYE, self.IDX_RIGHT_EYE, self.IDX_NOSE_TIP, self.IDX_MOUTH_LEFT, self.IDX_MOUTH_RIGHT]
+            pts = [[lm[j].x * W, lm[j].y * H] for j in idxs]
+            kps = np.array(pts, dtype=np.float32)
+            
+            if kps[0, 0] > kps[1, 0]: kps[[0, 1]] = kps[[1, 0]]
+            if kps[3, 0] > kps[4, 0]: kps[[3, 4]] = kps[[4, 3]]
+            
+            # Check consistency with ANY Haar box
+            # matched = False
+            # for hf in haar_faces:
+                # x, y, w, h = hf.tolist()
+                # margin = 0.35
+                # x1m, y1m = x - margin * w, y - margin * h
+                # x2m, y2m = x + (1.0 + margin) * w, y + (1.0 + margin) * h
+                
+                # inside = ((kps[:, 0] >= x1m) & (kps[:, 0] <= x2m) & (kps[:, 1] >= y1m) & (kps[:, 1] <= y2m))
+                # if inside.mean() >= 0.60:
+                    # matched = True
+                    # break
+            
+            # if not matched:
+                # continue
 
-        box = _bbox_from_5pt(kps, pad_x=0.55, pad_y_top=0.85, pad_y_bot=1.15)
-        box = _clip_box_xyxy(box, W, H)
-        
-        # No smoothing in this specific "raw" access method for now, or just return basic box
-        x1, y1, x2, y2 = box.tolist()
-        
-        fb = FaceKpsBox(
-            x1=int(round(x1)), y1=int(round(y1)), x2=int(round(x2)), y2=int(round(y2)),
-            score=1.0, kps=kps.astype(np.float32)
-        )
-        return [fb], res
+            if not _kps_span_ok(kps, min_eye_dist=10.0):
+                 continue
+
+            box = _bbox_from_5pt(kps, pad_x=0.55, pad_y_top=0.85, pad_y_bot=1.15)
+            box = _clip_box_xyxy(box, W, H)
+            
+            x1, y1, x2, y2 = box.tolist()
+            
+            fb = FaceKpsBox(
+                x1=int(round(x1)), y1=int(round(y1)), x2=int(round(x2)), y2=int(round(y2)),
+                score=1.0, kps=kps.astype(np.float32)
+            )
+            results.append(fb)
+            if len(results) >= max_faces:
+                break
+                
+        return results, res
 
 
 # -------------------------

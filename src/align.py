@@ -47,7 +47,7 @@ def _safe_imshow(win: str, img: np.ndarray):
 
 
 def main(
-    cam_index: int = 0,
+    cam_index: int = 1,
     out_size: Tuple[int, int] = (112, 112),
     mirror: bool = True,
 ):

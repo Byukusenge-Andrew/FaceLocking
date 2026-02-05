@@ -1,0 +1,32 @@
+10:43:25 | LOCK_ACQUIRED | sim=0.78
+10:43:25 | MOVE_LEFT | nose_x=0.60
+10:43:27 | LOCK_LOST | Target disappeared
+10:43:27 | LOCK_ACQUIRED | sim=0.76
+10:43:27 | LOCK_LOST | Target disappeared
+10:43:28 | LOCK_ACQUIRED | sim=0.77
+10:43:30 | MOVE_LEFT | nose_x=0.61
+10:43:36 | LOCK_LOST | Target disappeared
+10:43:50 | LOCK_ACQUIRED | sim=0.50
+10:43:51 | LOCK_LOST | Target disappeared
+10:43:52 | LOCK_ACQUIRED | sim=0.60
+10:43:52 | MOVE_RIGHT | nose_x=0.37
+10:43:53 | LOCK_LOST | Target disappeared
+10:44:11 | LOCK_ACQUIRED | sim=0.78
+10:44:11 | MOVE_LEFT | nose_x=0.78
+10:44:13 | MOVE_LEFT | nose_x=0.74
+10:44:14 | MOVE_LEFT | nose_x=0.66
+10:44:15 | MOVE_RIGHT | nose_x=0.47
+10:44:16 | LOCK_LOST | Target disappeared
+10:44:17 | LOCK_ACQUIRED | sim=0.74
+10:44:17 | MOVE_RIGHT | nose_x=0.50
+10:44:21 | LOCK_LOST | Target disappeared
+10:44:25 | LOCK_ACQUIRED | sim=0.71
+10:44:26 | LOCK_LOST | Target disappeared
+10:44:26 | LOCK_ACQUIRED | sim=0.79
+10:44:26 | LOCK_LOST | Target disappeared
+10:44:31 | LOCK_ACQUIRED | sim=0.78
+10:44:32 | LOCK_LOST | Target disappeared
+10:44:34 | LOCK_ACQUIRED | sim=0.78
+10:44:34 | MOVE_RIGHT | nose_x=0.48
+10:44:35 | LOCK_LOST | Target disappeared
+10:44:36 | LOCK_ACQUIRED | sim=0.78

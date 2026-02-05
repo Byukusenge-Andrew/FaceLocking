@@ -1,0 +1,12 @@
+09:02:47 | LOCK_ACQUIRED | sim=0.72
+09:02:49 | SMILE | ratio=0.45
+09:02:49 | MOVE_RIGHT | nose_x=0.47
+09:02:49 | LOCK_LOST | Frames without target > 10
+09:02:52 | LOCK_ACQUIRED | sim=0.81
+09:02:53 | MOVE_LEFT | nose_x=0.64
+09:02:53 | LOCK_LOST | Frames without target > 10
+09:03:02 | LOCK_ACQUIRED | sim=0.63
+09:03:03 | MOVE_RIGHT | nose_x=0.49
+09:03:06 | SMILE | ratio=0.50
+09:03:06 | MOVE_LEFT | nose_x=0.71
+09:03:06 | LOCK_LOST | Frames without target > 10
