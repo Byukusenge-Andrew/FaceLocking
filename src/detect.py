@@ -9,7 +9,7 @@ def main():
     if face.empty():
         raise RuntimeError(f"Failed to load cascade: {cascade_path}")
 
-    cap = cv2.VideoCapture(0)
+    cap = cv2.VideoCapture(1)
     if not cap.isOpened():
         raise RuntimeError("Camera not opened. Try camera index 0/1/2.")
 

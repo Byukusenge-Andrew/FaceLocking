@@ -322,7 +322,7 @@ def main():
     
     system = FaceLockSystem(args.name, matcher, det)
     
-    cap = cv2.VideoCapture(0)
+    cap = cv2.VideoCapture(1)
     print("Mask Locking System Started. Press 'q' to quit.")
     
     while True:
