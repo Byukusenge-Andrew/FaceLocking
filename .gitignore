@@ -3,5 +3,3 @@ venv/
 venv310/
 db/
 enroll/
-*.onnx
-*.zip
