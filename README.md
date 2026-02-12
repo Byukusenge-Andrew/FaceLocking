@@ -6,96 +6,102 @@
 **Instructor:** Gabriel Baziramwabo  
 **Organization:** Rwanda Coding Academy  
 
-This project implements a **practical, CPU-friendly face recognition pipeline** using:
-- **ArcFace** model (exported to ONNX for cross-platform inference)
-- **5-point facial landmark alignment** (eyes, nose, mouth corners)
-- **Haar Cascade** + **MediaPipe FaceMesh** for detection and landmarks
-- **Modular, testable stages** (no black-box end-to-end framework)
+This project implements a **Distributed Face Recognition and Tracking System** for IoT-based servo control using:
 
-The system is designed to be understandable, debuggable, reproducible, and runnable on ordinary laptops without a GPU.
+- **ArcFace** model (ONNX) for face recognition
+- **5-point facial landmark alignment** for precise face detection
+- **MQTT** for distributed communication between components
+- **ESP8266** microcontroller for edge-based servo control
+- **Real-time Web Dashboard** for system monitoring
+
+The system is designed for **embedded systems applications**, demonstrating how computer vision, IoT communication, and edge computing work together in a practical face-tracking servo control system.
 
 ## Table of Contents
 
-- [Overview](#overview)
+- [Assessment Details (Week 06)](#assessment-details-week-06)
+- [System Architecture](#system-architecture)
 - [Features](#features)
 - [Project Structure](#project-structure)
-- [Requirements](#requirements)
 - [Quick Start](#quick-start)
-- [Pipeline Overview](#pipeline-overview)
 - [Usage](#usage)
-  - [1. Camera & Detection Validation](#1-camera--detection-validation)
-  - [2. Enrollment](#2-enrollment)
-  - [3. Threshold Evaluation](#3-threshold-evaluation)
-  - [4. Live Recognition](#4-live-recognition)
-  - [5. Face Locking](#5-face-locking)
-- [Key Concepts](#key-concepts)
-- [Troubleshooting](#troubleshooting)
-- [Acknowledgments](#acknowledgments)
-- [License](#license)
 
-## Overview
+## System Architecture
 
-This repository accompanies the book *"Face Recognition with ArcFace ONNX and 5-Point Alignment"*.
+This distributed system consists of four main components:
 
-It demonstrates how to build a complete face recognition system from scratch — **not** just calling a pre-built library. Every stage is explicit and replaceable:
-
-- Face detection → 5-point landmark detection → geometric alignment → embedding extraction → enrollment → cosine-similarity matching
-
-The system emphasizes **CPU execution**, **reproducibility**, and **explainability** over maximum accuracy.
+1. **Vision Node (PC)**: Detects, recognizes, and tracks faces using ArcFace and MediaPipe. Publishes movement commands via MQTT.
+2. **MQTT Broker (VPS)**: Central message broker facilitating communication between all components.
+3. **ESP8266 (Edge Controller)**: Subscribes to movement commands and controls a servo motor to physically track the detected face.
+4. **Web Dashboard**: Real-time visualization of system status, tracking data, and lock status.
 
 ## Features
 
-- CPU-only inference with ONNX Runtime
-- 5-point alignment using left/right eye, nose tip, mouth corners
-- Modular scripts — each file does one thing
-- Automated project initialization (`init_project.py`)
-- Enrollment with auto-capture and existing crop re-use
-- Real-time multi-face recognition
-- Threshold tuning based on genuine/impostor distances
-- **Face Locking & Action Detection**: Lock onto a specific identity and track their face, detecting blinks, smiles, and movements.
+- **Face Recognition & Locking**: Lock onto a specific enrolled identity and track their movements
+- **Distributed Architecture**: Components communicate via MQTT, allowing flexible deployment
+- **Real-time Servo Control**: ESP8266 controls servo motor based on face position
+- **Live Dashboard**: Web-based monitoring with WebSocket updates
+- **Action Detection**: Detects blinks, smiles, and head movements
+- **CPU-friendly**: Runs on standard laptops without GPU requirements
 
 ## Project Structure
 
-```text
-face-recognition-5pt/
-├── data/                 # Generated data (ignored in .gitignore)
-│   ├── db/               # face_db.npz + face_db.json
-│   └── enroll/           # per-person aligned 112×112 crops
-├── models/
-│   └── embedder_arcface.onnx     # ArcFace model (download separately)
+```
+Face_recognition_with_Arcface/
 ├── src/
-│   ├── camera.py         # Webcam test + FPS
-│   ├── detect.py         # Haar face detection test
-│   ├── landmarks.py      # 5-point landmark visualization
-│   ├── align.py          # Alignment demo
-│   ├── embed.py          # Embedding extraction + visualization
-│   ├── enroll.py         # Enroll identities
-│   ├── evaluate.py       # Threshold tuning
-│   ├── haar_5pt.py       # Core: Haar + MediaPipe 5pt detector
-│   ├── recognize.py      # Real-time recognition
-│   └── face_locking.py   # Face Locking & Action Detection (Assignments)
-├── init_project.py       # Creates folder structure
-├── README.md
-└── .gitignore
+│   ├── vision_node.py       # Main vision processing + MQTT publisher
+│   ├── face_locking.py      # Face locking & action detection
+│   ├── haar_5pt.py          # Face detection core
+│   └── recognize.py         # ArcFace recognition
+├── backend/
+│   ├── server.js            # MQTT-to-WebSocket relay
+│   └── package.json
+├── dashboard/
+│   └── index.html           # Real-time web dashboard
+├── esp8266/
+│   └── vision_servo/
+│       └── vision_servo.ino # Arduino firmware for ESP8266
+├── data/
+│   └── db/                  # Face database (face_db.npz)
+└── models/
+    └── embedder_arcface.onnx
 ```
 
 ## Quick Start
-1. Install requirements:
-   ```bash
-   pip install -r requirements.txt
-   ```
-2. Initialize project (if needed):
-   ```bash
-   python init_project.py
-   ```
-3. Enroll a user:
-   ```bash
-   python -m src.enroll
-   ```
-4. Run Face Locking:
-   ```bash
-   python -m src.face_locking --name [YOUR_NAME]
-   ```
+
+### 1. Install Dependencies
+```bash
+pip install -r requirements.txt
+cd backend && npm install
+```
+
+### 2. Enroll Your Face
+```bash
+python -m src.enroll --name andrew
+```
+
+### 3. Start the System
+
+**On VPS (or local MQTT broker):**
+```bash
+mosquitto -c mosquitto.conf
+```
+
+**On PC - Terminal 1 (Backend):**
+```bash
+cd backend
+npm start
+```
+
+**On PC - Terminal 2 (Vision Node):**
+```bash
+python src/vision_node.py --broker 157.173.101.159 --name andrew
+```
+
+### 4. Flash ESP8266
+Upload `esp8266/vision_servo/vision_servo.ino` using Arduino IDE.
+
+### 5. Access Dashboard
+Open: [http://157.173.101.159:8082](http://157.173.101.159:8082)
 
 ## Assessment Details (Week 06)
 
