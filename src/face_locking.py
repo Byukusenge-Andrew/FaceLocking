@@ -107,9 +107,9 @@ class FaceActionDetector:
         # Check nose x relative to frame center (0.5 in normalized coords)
         nose = coords[self.P_NOSE_TIP]
         if nose[0] < 0.50:
-             actions.append(("MOVE_RIGHT", f"nose_x={nose[0]:.2f}"))
-        elif nose[0] > 0.60:
              actions.append(("MOVE_LEFT", f"nose_x={nose[0]:.2f}"))
+        elif nose[0] > 0.60:
+             actions.append(("MOVE_RIGHT", f"nose_x={nose[0]:.2f}"))
              
         return actions
 
@@ -160,7 +160,7 @@ class FaceLockSystem:
             f.write(line)
         print(f">> ACTION: {atype} ({details})")
 
-    def process_frame(self, frame: np.ndarray, embedder: ArcFaceEmbedderONNX) -> np.ndarray:
+    def process_frame(self, frame: np.ndarray, embedder: ArcFaceEmbedderONNX) -> Tuple[np.ndarray, Optional[object]]:
         vis = frame.copy()
         H, W = vis.shape[:2]
 
@@ -295,7 +295,7 @@ class FaceLockSystem:
                     self.state = LockState.SEARCHING
                     self.log_action("LOCK_LOST", "Target disappeared")
 
-        return vis
+        return vis, target_face
 
 
 def main():
@@ -332,7 +332,7 @@ def main():
         # Mirror the frame (user requested to "remove" the flip, implying they want the opposite of current)
         frame = cv2.flip(frame, 1)
         
-        vis = system.process_frame(frame, embedder)
+        vis, _ = system.process_frame(frame, embedder)
         
         cv2.imshow("Face Locking", vis)
         if cv2.waitKey(1) & 0xFF == ord('q'):

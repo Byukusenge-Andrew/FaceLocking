@@ -4,12 +4,12 @@
 
 // --- Configuration ---
 // WiFi Credentials (from your snippet)
-const char* ssid = "RCA";
-const char* password = "@RcaNyabihu2023";
+const char* ssid = "EdNet";
+const char* password = "Huawei@123";
 
 // MQTT Broker
 // For LOCAL TESTING: Use your PC's IP address (e.g., 10.12.73.80) because 'localhost' refers to the ESP itself.
-// VPS DEPLOYMENT: Using VPS IP because local WiFi likely blocks peer-to-peer.
+// For VPS DEPLOYMENT: Use "157.173.101.159"
 const char* mqtt_server = "157.173.101.159"; 
 
 const int mqtt_port = 1883;
@@ -57,15 +57,13 @@ void callback(char* topic, byte* payload, unsigned int length) {
   }
   Serial.println(message);
 
-  // Simple parsing
+  // Simple parsing (JSON parsing in C++ is tedious without a library, using string matching)
   if (message.indexOf("MOVE_LEFT") > 0) {
-    Serial.println("Command: LEFT -> Moving Servo");
     moveServo(5); // Move Left
   } else if (message.indexOf("MOVE_RIGHT") > 0) {
-    Serial.println("Command: RIGHT -> Moving Servo");
     moveServo(-5); // Move Right
   } else if (message.indexOf("CENTERED") > 0) {
-    Serial.println("Command: CENTERED -> Holding Position");
+    // Optional: Hold position or recenter
   }
 }
 
@@ -102,16 +100,7 @@ void setup() {
   
   // Setup Servo
   myServo.attach(servoPin);
-  
-  // STATUP WIGGLE TEST
-  Serial.println("Testing Servo...");
-  myServo.write(0);   // Left
-  delay(500);
-  myServo.write(180); // Right
-  delay(500);
-  myServo.write(90);  // Center
-  delay(500);
-  currentAngle = 90;
+  myServo.write(currentAngle); // Center
 
   setup_wifi();
   client.setServer(mqtt_server, mqtt_port);

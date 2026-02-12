@@ -192,7 +192,10 @@
         <div class="card">
             <h2>Tracking Status</h2>
             <div id="movement-status" class="value">WAITING...</div>
-            <div id="confidence" style="font-size: 1rem; color: #666;">Confidence: --</div>
+            <div id="target-info" style="font-size: 1.2rem; color: #aaa; margin-top: 10px;">Target: --</div>
+            <div id="lock-status" class="status-badge" style="background: #333; color: #888; margin-top: 5px;">SEARCHING
+            </div>
+            <div id="confidence" style="font-size: 0.9rem; color: #666; margin-top: 5px;">Confidence: --</div>
         </div>
 
         <!-- System State Card -->
@@ -210,9 +213,8 @@
     </div>
 
     <script>
-        // Dynamically determine WebSocket URL based on where this page is served from
-        const wsHost = window.location.hostname || 'localhost';
-        const wsUrl = `ws://${wsHost}:9002`;
+        // Connect to Backend running on PC
+        const wsUrl = `ws://10.12.73.80:9002`;
         let ws;
 
         const statusEl = document.getElementById('movement-status');
@@ -260,8 +262,27 @@
             };
         }
 
+        const targetEl = document.getElementById('target-info');
+        const lockEl = document.getElementById('lock-status');
+
         function updateDashboard(data) {
             statusEl.textContent = data.status;
+
+            // Update Target Info
+            if (data.target) targetEl.textContent = `Target: ${data.target}`;
+
+            // Update Lock Status
+            if (data.locked) {
+                lockEl.textContent = "LOCKED";
+                lockEl.style.background = "rgba(0, 255, 157, 0.2)";
+                lockEl.style.color = "#00ff9d";
+                lockEl.style.border = "1px solid #00ff9d";
+            } else {
+                lockEl.textContent = "SEARCHING";
+                lockEl.style.background = "rgba(255, 165, 0, 0.2)";
+                lockEl.style.color = "orange";
+                lockEl.style.border = "1px solid orange";
+            }
 
             // Visual feedback based on status
             if (data.status === 'MOVE_LEFT') {

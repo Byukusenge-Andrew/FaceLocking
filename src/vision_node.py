@@ -12,12 +12,15 @@ import json
 import numpy as np
 import paho.mqtt.client as mqtt
 from pathlib import Path
-
-# Add src to path if needed to import modules
 import sys
+
+# Add src to path if needed
 sys.path.append(str(Path(__file__).parent.parent))
 
+# Import Face Locking modules
 from src.haar_5pt import Haar5ptDetector
+from src.recognize import ArcFaceEmbedderONNX, FaceDBMatcher, load_db_npz
+from src.face_locking import FaceLockSystem
 
 # Configuration
 DEFAULT_BROKER = "localhost" 
@@ -27,44 +30,66 @@ TOPIC_MOVEMENT = f"vision/{TEAM_ID}/movement"
 TOPIC_HEARTBEAT = f"vision/{TEAM_ID}/heartbeat"
 
 class VisionNode:
-    def __init__(self, broker, port):
+    def __init__(self, broker, port, target_name):
+        # MQTT Setup
         self.client = mqtt.Client(client_id=f"{TEAM_ID}_vision_node")
         self.client.on_connect = self.on_connect
         self.client.connect(broker, port, 60)
         self.client.loop_start()
         
+        # Face Recognition & Locking Setup
+        print("Initializing Face Recognition...")
         self.det = Haar5ptDetector(min_size=(70, 70))
+        self.embedder = ArcFaceEmbedderONNX(input_size=(112, 112))
+        
+        # Load Database
+        db_path = Path(__file__).parent.parent / "data/db/face_db.npz"
+        if not db_path.exists():
+            print(f"ERROR: Face DB not found at {db_path}. Run enroll.py first!")
+            sys.exit(1)
+            
+        db = load_db_npz(db_path)
+        if target_name not in db:
+            print(f"WARNING: Target '{target_name}' not in database. Available: {list(db.keys())}")
+        
+        self.matcher = FaceDBMatcher(db, dist_thresh=0.60)
+        self.system = FaceLockSystem(target_name, self.matcher, self.det)
+        
         self.running = True
         self.last_heartbeat = 0
         self.last_publish_time = 0
+        self.mqtt_topic = TOPIC_MOVEMENT
 
     def on_connect(self, client, userdata, flags, rc):
         print(f"Connected to MQTT Broker with result code {rc}")
         self.publish_heartbeat()
 
-    def publish_movement(self, status, confidence=1.0):
+    def publish_movement(self, status, confidence=1.0, target=None, locked=False):
         payload = {
             "status": status,
             "confidence": confidence,
+            "target": target,
+            "locked": locked,
             "timestamp": time.time()
         }
-        self.client.publish(TOPIC_MOVEMENT, json.dumps(payload))
+        self.client.publish(self.mqtt_topic, json.dumps(payload))
         print(f"Published: {payload}")
 
     def publish_heartbeat(self):
         payload = {
-            "node": "pc",
+            "node": "pc_vision",
             "status": "ONLINE",
             "timestamp": time.time()
         }
         self.client.publish(TOPIC_HEARTBEAT, json.dumps(payload))
 
     def run(self):
-        cap = cv2.VideoCapture(0) # Use default camera (usually 0)
+        cap = cv2.VideoCapture(0) # Use default camera
         if not cap.isOpened():
-             cap = cv2.VideoCapture(1) # Try 1 if 0 fails
+             cap = cv2.VideoCapture(1)
         
-        print(f"Vision Node Started. Publishing to {TOPIC_MOVEMENT}")
+        print(f"Vision Node Started. Tracking target: {self.system.target_name}")
+        print(f"Publishing to {TOPIC_MOVEMENT}")
         
         while self.running:
             ret, frame = cap.read()
@@ -74,43 +99,34 @@ class VisionNode:
             frame = cv2.flip(frame, 1)
             H, W = frame.shape[:2]
             
-            # Detect Face
-            faces = self.det.detect(frame)
+            # Process Frame using FaceLockSystem
+            # Note: process_frame now returns (vis_frame, target_face_obj)
+            vis, target_face = self.system.process_frame(frame, self.embedder)
             
             status = "NO_FACE"
             
-            if faces:
-                # Get largest face
-                f = max(faces, key=lambda x: (x.x2-x.x1)*(x.y2-x.y1))
-                
-                # Draw Box
-                cv2.rectangle(frame, (f.x1, f.y1), (f.x2, f.y2), (0, 255, 0), 2)
+            if target_face:
+                # Target is found and locked
+                f = target_face
                 
                 # Calculate Center
                 cx = (f.x1 + f.x2) / 2.0
                 cx_norm = cx / W
                 
-                # Logic:
-                # If face is on LEFT (cx_norm < 0.4), camera must move LEFT to center it.
-                # If face is on RIGHT (cx_norm > 0.6), camera must move RIGHT to center it.
-                
+                # Movement Logic
+                # Deadband: 0.4 to 0.6 is CENTERED
                 if cx_norm < 0.4:
                     status = "MOVE_LEFT"
                 elif cx_norm > 0.6:
                     status = "MOVE_RIGHT"
                 else:
                     status = "CENTERED"
-                
-                cv2.putText(frame, f"{status} ({cx_norm:.2f})", (f.x1, f.y1-10), 
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 255), 2)
-            else:
-                cv2.putText(frame, "NO FACE", (50, 50), 
-                            cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 255), 2)
             
             # --- RATE LIMITING (10Hz) ---
             current_time = time.time()
             if current_time - self.last_publish_time >= 0.1:
-                self.publish_movement(status)
+                is_locked = (status != "NO_FACE")
+                self.publish_movement(status, target=self.system.target_name, locked=is_locked)
                 self.last_publish_time = current_time
             
             # Heartbeat every 5s
@@ -118,7 +134,7 @@ class VisionNode:
                 self.publish_heartbeat()
                 self.last_heartbeat = time.time()
             
-            cv2.imshow("Vision Node", frame)
+            cv2.imshow("Vision Node (Locked)", vis)
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
         
@@ -129,7 +145,8 @@ class VisionNode:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--broker", type=str, default=DEFAULT_BROKER, help="MQTT Broker Address")
+    parser.add_argument("--name", type=str, default="andrew", help="Target name to lock onto")
     args = parser.parse_args()
 
-    node = VisionNode(args.broker, PORT)
+    node = VisionNode(args.broker, PORT, args.name)
     node.run()

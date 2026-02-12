@@ -2,8 +2,9 @@
 
 <img src="https://via.placeholder.com/800x200/007bff/ffffff?text=ArcFace+ONNX+%2B+5-Point+Alignment" alt="Project Banner" width="800"/>
 
-**Author:** Gabriel Baziramwabo  
-**Organization:** Benax Technologies Ltd · Rwanda Coding Academy  
+**Author:** Andrew Byukusenge  
+**Instructor:** Gabriel Baziramwabo  
+**Organization:** Rwanda Coding Academy  
 
 This project implements a **practical, CPU-friendly face recognition pipeline** using:
 - **ArcFace** model (exported to ONNX for cross-platform inference)
@@ -96,8 +97,24 @@ face-recognition-5pt/
    python -m src.face_locking --name [YOUR_NAME]
    ```
 
+## Assessment Details (Week 06)
+
+### System Description
+This project implements a **Distributed Face Recognition and Locking System** using:
+1.  **Vision Node (PC)**: Detects, recognizes, and tracks faces using ArcFace and MediaPipe. Publishes movement commands.
+2.  **MQTT Broker (VPS)**: Facilitates communication between the PC, ESP8266, and Dashboard.
+3.  **ESP8266 (Edge)**: Subscribes to movement commands and controls a Servo motor to track the face.
+4.  **Web Dashboard**: Visualizes the real-time blocking status and tracking info.
+
+### MQTT Topics
+-   `vision/team313/movement`: JSON payload with `status` (MOVE_LEFT, MOVE_RIGHT, CENTERED), `target`, and `locked` state.
+-   `vision/team313/heartbeat`: System health status.
+
+### Live Dashboard
+**URL**: [http://157.173.101.159:8082](http://157.173.101.159:8082)
+
 ## Face Locking
-The new Face Locking feature (`src/face_locking.py`) allows you to track a single enrolled identity continuously.
+The new Face Locking feature (`src/face_locking.py` and `vision_node.py`) allows you to track a single enrolled identity continuously.
 
 **How it works:**
 1.  **Search**: The system looks for the user using ArcFace recognition.
