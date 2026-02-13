@@ -13,6 +13,7 @@ import numpy as np
 import paho.mqtt.client as mqtt
 from pathlib import Path
 import sys
+import base64
 
 # Add src to path if needed
 sys.path.append(str(Path(__file__).parent.parent))
@@ -59,12 +60,13 @@ class VisionNode:
         self.last_heartbeat = 0
         self.last_publish_time = 0
         self.mqtt_topic = TOPIC_MOVEMENT
+        self.snapshot_sent = False  # Track if we've sent the face snapshot
 
     def on_connect(self, client, userdata, flags, rc):
         print(f"Connected to MQTT Broker with result code {rc}")
         self.publish_heartbeat()
 
-    def publish_movement(self, status, confidence=1.0, target=None, locked=False):
+    def publish_movement(self, status, confidence=1.0, target=None, locked=False, face_image=None):
         payload = {
             "status": status,
             "confidence": confidence,
@@ -72,8 +74,14 @@ class VisionNode:
             "locked": locked,
             "timestamp": time.time()
         }
+        
+        # Add face image if available
+        if face_image is not None:
+            _, buffer = cv2.imencode('.jpg', face_image, [cv2.IMWRITE_JPEG_QUALITY, 70])
+            payload["face_image"] = base64.b64encode(buffer).decode('utf-8')
+        
         self.client.publish(self.mqtt_topic, json.dumps(payload))
-        print(f"Published: {payload}")
+        print(f"Published: {status} (image: {'yes' if face_image is not None else 'no'})")
 
     def publish_heartbeat(self):
         payload = {
@@ -104,10 +112,24 @@ class VisionNode:
             vis, target_face = self.system.process_frame(frame, self.embedder)
             
             status = "NO_FACE"
+            face_crop = None
             
             if target_face:
                 # Target is found and locked
                 f = target_face
+                
+                # Extract face crop for dashboard (only if not sent yet)
+                if not self.snapshot_sent:
+                    x1, y1, x2, y2 = int(f.x1), int(f.y1), int(f.x2), int(f.y2)
+                    # Add padding
+                    pad = 20
+                    x1 = max(0, x1 - pad)
+                    y1 = max(0, y1 - pad)
+                    x2 = min(W, x2 + pad)
+                    y2 = min(H, y2 + pad)
+                    face_crop = frame[y1:y2, x1:x2]
+                    self.snapshot_sent = True  # Mark as sent
+                    print("📸 Face snapshot captured and will be sent")
                 
                 # Calculate Center
                 cx = (f.x1 + f.x2) / 2.0
@@ -121,12 +143,17 @@ class VisionNode:
                     status = "MOVE_RIGHT"
                 else:
                     status = "CENTERED"
+            else:
+                # No face detected - reset snapshot flag
+                if self.snapshot_sent:
+                    self.snapshot_sent = False
+                    print("🔓 Target lost - snapshot flag reset")
             
             # --- RATE LIMITING (10Hz) ---
             current_time = time.time()
             if current_time - self.last_publish_time >= 0.1:
                 is_locked = (status != "NO_FACE")
-                self.publish_movement(status, target=self.system.target_name, locked=is_locked)
+                self.publish_movement(status, target=self.system.target_name, locked=is_locked, face_image=face_crop)
                 self.last_publish_time = current_time
             
             # Heartbeat every 5s

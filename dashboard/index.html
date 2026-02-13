@@ -188,6 +188,17 @@
     </header>
 
     <div class="container">
+        <!-- Face Picture Card -->
+        <div class="card">
+            <h2>Face Picture</h2>
+            <div id="face-container"
+                style="display: flex; justify-content: center; align-items: center; min-height: 200px;">
+                <img id="face-image" src="" alt="No face detected"
+                    style="max-width: 100%; max-height: 300px; border-radius: 8px; display: none; border: 2px solid var(--accent-color);" />
+                <div id="no-face-msg" style="color: #666; font-size: 1rem;">Waiting for face...</div>
+            </div>
+        </div>
+
         <!-- Movement Status Card -->
         <div class="card">
             <h2>Tracking Status</h2>
@@ -264,12 +275,24 @@
 
         const targetEl = document.getElementById('target-info');
         const lockEl = document.getElementById('lock-status');
+        const faceImageEl = document.getElementById('face-image');
+        const noFaceMsgEl = document.getElementById('no-face-msg');
 
         function updateDashboard(data) {
             statusEl.textContent = data.status;
 
             // Update Target Info
             if (data.target) targetEl.textContent = `Target: ${data.target}`;
+
+            // Update Face Image
+            if (data.face_image) {
+                faceImageEl.src = 'data:image/jpeg;base64,' + data.face_image;
+                faceImageEl.style.display = 'block';
+                noFaceMsgEl.style.display = 'none';
+            } else {
+                faceImageEl.style.display = 'none';
+                noFaceMsgEl.style.display = 'block';
+            }
 
             // Update Lock Status
             if (data.locked) {
