@@ -101,7 +101,7 @@ python src/vision_node.py --broker 157.173.101.159 --name andrew
 Upload `esp8266/vision_servo/vision_servo.ino` using Arduino IDE.
 
 ### 5. Access Dashboard
-Open: [http://157.173.101.159:8082](http://157.173.101.159:8082)
+Open: [http://157.173.101.159:9313]([http://157.173.101.159:9313/])
 
 ## Assessment Details (Week 06)
 
@@ -117,7 +117,7 @@ This project implements a **Distributed Face Recognition and Locking System** us
 -   `vision/team313/heartbeat`: System health status.
 
 ### Live Dashboard
-**URL**: [http://157.173.101.159:8082](http://157.173.101.159:8082)
+**URL**: [http://157.173.101.159:8082]([http://157.173.101.159:9313/])
 
 ## Face Locking
 The new Face Locking feature (`src/face_locking.py` and `vision_node.py`) allows you to track a single enrolled identity continuously.
