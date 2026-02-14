@@ -284,15 +284,18 @@
             // Update Target Info
             if (data.target) targetEl.textContent = `Target: ${data.target}`;
 
-            // Update Face Image
+            // Update Face Image - only update if new image received
             if (data.face_image) {
                 faceImageEl.src = 'data:image/jpeg;base64,' + data.face_image;
                 faceImageEl.style.display = 'block';
                 noFaceMsgEl.style.display = 'none';
-            } else {
+            }
+            // Only clear image when target is lost (not locked)
+            else if (!data.locked) {
                 faceImageEl.style.display = 'none';
                 noFaceMsgEl.style.display = 'block';
             }
+            // If locked but no new image, keep showing existing image
 
             // Update Lock Status
             if (data.locked) {
