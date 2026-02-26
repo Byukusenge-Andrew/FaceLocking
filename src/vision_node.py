@@ -92,7 +92,7 @@ class VisionNode:
         self.client.publish(TOPIC_HEARTBEAT, json.dumps(payload))
 
     def run(self):
-        cap = cv2.VideoCapture(0) # Use default camera
+        cap = cv2.VideoCapture(1) # Use default camera
         if not cap.isOpened():
              cap = cv2.VideoCapture(1)
         
