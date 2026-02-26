@@ -1,0 +1,8 @@
+09:06:43 | LOCK_ACQUIRED | sim=0.67
+09:06:43 | MOVE_LEFT | nose_x=0.40
+09:06:44 | MOVE_LEFT | nose_x=0.39
+09:06:45 | MOVE_LEFT | nose_x=0.46
+09:06:46 | MOVE_LEFT | nose_x=0.25
+09:06:47 | MOVE_RIGHT | nose_x=0.67
+09:06:48 | MOVE_LEFT | nose_x=0.40
+09:06:49 | MOVE_LEFT | nose_x=0.36
