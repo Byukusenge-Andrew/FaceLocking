@@ -24,7 +24,7 @@ from src.recognize import ArcFaceEmbedderONNX, FaceDBMatcher, load_db_npz
 from src.face_locking import FaceLockSystem
 
 # Configuration
-DEFAULT_BROKER = "localhost" 
+DEFAULT_BROKER = "[IP_ADDRESS]" 
 PORT = 1883
 TEAM_ID = "team313"
 TOPIC_MOVEMENT = f"vision/{TEAM_ID}/movement"
