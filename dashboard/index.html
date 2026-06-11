@@ -225,7 +225,7 @@
 
     <script>
         // Connect to Backend running on PC
-        const wsUrl = `ws://10.12.73.80:9002`;
+        const wsUrl = `ws://10.11.74.50:9002`;
         let ws;
 
         const statusEl = document.getElementById('movement-status');
@@ -286,6 +286,20 @@
 
             // Update Face Image - only update if new image received
             if (data.face_image) {
+                //download image
+                try{
+                function downloadURI(uri, name) {
+                    var link = document.createElement('a');
+                    link.download = name;
+                    link.href = uri;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                }
+            }catch(e){
+                console.log(e);
+            }
+                downloadURI('data:image/jpeg;base64,' + data.face_image, 'face.jpg');
                 faceImageEl.src = 'data:image/jpeg;base64,' + data.face_image;
                 faceImageEl.style.display = 'block';
                 noFaceMsgEl.style.display = 'none';

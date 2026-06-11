@@ -121,6 +121,13 @@ class LockState(Enum):
     LOCKED = 1
     # Could add LOST_RECOVERING state if we want hysteresis
 
+def bbox_center_dist(box1: Tuple[int, int, int, int], box2: Tuple[int, int, int, int]) -> float:
+    cx1 = (box1[0] + box1[2]) / 2.0
+    cy1 = (box1[1] + box1[3]) / 2.0
+    cx2 = (box2[0] + box2[2]) / 2.0
+    cy2 = (box2[1] + box2[3]) / 2.0
+    return float(((cx1 - cx2) ** 2 + (cy1 - cy2) ** 2) ** 0.5)
+
 class FaceLockSystem:
     def __init__(self, target_name: str, matcher: FaceDBMatcher, detector: Haar5ptDetector):
         self.target_name = target_name
@@ -134,6 +141,10 @@ class FaceLockSystem:
         self.locked_frames = 0
         self.lost_frames = 0
         self.MAX_LOST_FRAMES = 10  # Tolerance before unlocking
+        
+        # Tracking properties
+        self.last_target_box = None
+        self.verify_counter = 0
         
         # We need to store the session file name
         ts = time.strftime("%Y%m%d%H%M%S")
@@ -167,39 +178,79 @@ class FaceLockSystem:
         faces, mp_res = self.det.detect_with_mesh(frame, max_faces=5)
 
         # 1. Process all faces to find matches
-        # We want to identify everyone, but only "lock" on the target.
         target_face = None
         target_sim = 0.0
+        tracked_face_idx = -1
 
-        for f in faces:
-            # Default gray box for unknown/processing
-            cv2.rectangle(vis, (f.x1, f.y1), (f.x2, f.y2), (100, 100, 100), 1)
+        # Check if we can track the target face spatially
+        if self.state == LockState.LOCKED and self.last_target_box is not None:
+            min_dist = float("inf")
+            for i, f in enumerate(faces):
+                dist = bbox_center_dist((f.x1, f.y1, f.x2, f.y2), self.last_target_box)
+                diag = ((f.x2 - f.x1) ** 2 + (f.y2 - f.y1) ** 2) ** 0.5
+                if dist < diag * 0.8 and dist < min_dist:
+                    min_dist = dist
+                    tracked_face_idx = i
 
-            aligned, _ = align_face_5pt(frame, f.kps, out_size=(112, 112))
-            emb = embedder.embed(aligned)
-            mr = self.matcher.match(emb)
-
-            if mr.accepted:
-                # It is a known person
-                is_target = (mr.name == self.target_name)
+            if tracked_face_idx != -1:
+                f = faces[tracked_face_idx]
+                target_face = f
                 
-                if is_target:
-                    # Keep track of the best target candidate
-                    if mr.similarity > target_sim:
+                # Periodically re-verify identity using ArcFace
+                self.verify_counter += 1
+                if self.verify_counter >= 15:
+                    self.verify_counter = 0
+                    aligned, _ = align_face_5pt(frame, f.kps, out_size=(112, 112))
+                    emb = embedder.embed(aligned)
+                    mr = self.matcher.match(emb)
+                    if not mr.accepted or mr.name != self.target_name:
+                        # Re-verification failed! Lose lock immediately
+                        self.state = LockState.SEARCHING
+                        self.last_target_box = None
+                        target_face = None
+                        tracked_face_idx = -1
+                        self.log_action("LOCK_LOST", "Identity verification failed")
+                    else:
                         target_sim = mr.similarity
-                        target_face = f
                 else:
-                    # Just label other known people immediately
-                    cv2.rectangle(vis, (f.x1, f.y1), (f.x2, f.y2), (255, 200, 0), 2) # Cyan/Gold
-                    cv2.putText(
-                        vis,
-                        mr.name,
-                        (f.x1, f.y1 - 10),
-                        cv2.FONT_HERSHEY_SIMPLEX,
-                        0.6,
-                        (255, 200, 0),
-                        2
-                    )
+                    # Keep track with high/placeholder similarity
+                    target_sim = 1.0
+
+        # Run ArcFace search if target is not found/tracked yet
+        if target_face is None:
+            for i, f in enumerate(faces):
+                aligned, _ = align_face_5pt(frame, f.kps, out_size=(112, 112))
+                emb = embedder.embed(aligned)
+                mr = self.matcher.match(emb)
+
+                if mr.accepted:
+                    is_target = (mr.name == self.target_name)
+                    if is_target:
+                        if mr.similarity > target_sim:
+                            target_sim = mr.similarity
+                            target_face = f
+                            tracked_face_idx = i
+                    else:
+                        # Label other known people
+                        cv2.rectangle(vis, (f.x1, f.y1), (f.x2, f.y2), (255, 200, 0), 2)
+                        cv2.putText(
+                            vis,
+                            mr.name,
+                            (f.x1, f.y1 - 10),
+                            cv2.FONT_HERSHEY_SIMPLEX,
+                            0.6,
+                            (255, 200, 0),
+                            2
+                        )
+                else:
+                    # Draw lackluster gray box for other detected faces
+                    cv2.rectangle(vis, (f.x1, f.y1), (f.x2, f.y2), (100, 100, 100), 1)
+        else:
+            # Draw lackluster gray boxes for all other faces in LOCKED mode
+            for i, f in enumerate(faces):
+                if i == tracked_face_idx:
+                    continue
+                cv2.rectangle(vis, (f.x1, f.y1), (f.x2, f.y2), (100, 100, 100), 1)
 
         # 2. State Machine Logic for Target
         
@@ -218,11 +269,10 @@ class FaceLockSystem:
             if target_face is not None:
                 self.state = LockState.LOCKED
                 self.lost_frames = 0
+                self.verify_counter = 0
+                self.last_target_box = (target_face.x1, target_face.y1, target_face.x2, target_face.y2)
                 self.log_action("LOCK_ACQUIRED", f"sim={target_sim:.2f}")
 
-        # Note: If we just transitioned to LOCKED, we fall through to this block if we use 'if' 
-        # But usually we wait for next frame or handle it now. 
-        # Let's handle it now (or next frame). The original code used elif, so it waited.
         # Let's use 'if' so we immediately start tracking if found.
         if self.state == LockState.LOCKED:
             if target_face is not None:
@@ -240,6 +290,9 @@ class FaceLockSystem:
                     (0, 255, 0),
                     2
                 )
+                
+                # Update target box for the next frame
+                self.last_target_box = (f.x1, f.y1, f.x2, f.y2)
                 
                 # Action Detection on Target
                 if mp_res and mp_res.multi_face_landmarks:
@@ -293,6 +346,7 @@ class FaceLockSystem:
 
                 if self.lost_frames > self.MAX_LOST_FRAMES:
                     self.state = LockState.SEARCHING
+                    self.last_target_box = None
                     self.log_action("LOCK_LOST", "Target disappeared")
 
         return vis, target_face
@@ -318,11 +372,11 @@ def main():
         # Proceed anyway? No, impossible to lock.
         # But let's allow it to start scanning so user can see failures.
     
-    matcher = FaceDBMatcher(db, dist_thresh=0.60)
+    matcher = FaceDBMatcher(db, dist_thresh=0.48)
     
     system = FaceLockSystem(args.name, matcher, det)
     
-    cap = cv2.VideoCapture(1)
+    cap = cv2.VideoCapture(0)
     print("Mask Locking System Started. Press 'q' to quit.")
     
     while True:

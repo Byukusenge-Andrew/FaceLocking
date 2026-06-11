@@ -24,7 +24,7 @@ from src.recognize import ArcFaceEmbedderONNX, FaceDBMatcher, load_db_npz
 from src.face_locking import FaceLockSystem
 
 # Configuration
-DEFAULT_BROKER = "[IP_ADDRESS]" 
+DEFAULT_BROKER = "157.173.101.159" 
 PORT = 1883
 TEAM_ID = "team313"
 TOPIC_MOVEMENT = f"vision/{TEAM_ID}/movement"
@@ -53,7 +53,7 @@ class VisionNode:
         if target_name not in db:
             print(f"WARNING: Target '{target_name}' not in database. Available: {list(db.keys())}")
         
-        self.matcher = FaceDBMatcher(db, dist_thresh=0.60)
+        self.matcher = FaceDBMatcher(db, dist_thresh=0.48)
         self.system = FaceLockSystem(target_name, self.matcher, self.det)
         
         self.running = True
@@ -92,9 +92,9 @@ class VisionNode:
         self.client.publish(TOPIC_HEARTBEAT, json.dumps(payload))
 
     def run(self):
-        cap = cv2.VideoCapture(1) # Use default camera
+        cap = cv2.VideoCapture(0) # Use default camera
         if not cap.isOpened():
-             cap = cv2.VideoCapture(1)
+             cap = cv2.VideoCapture(0)
         
         print(f"Vision Node Started. Tracking target: {self.system.target_name}")
         print(f"Publishing to {TOPIC_MOVEMENT}")

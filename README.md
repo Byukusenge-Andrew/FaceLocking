@@ -34,6 +34,70 @@ This distributed system consists of four main components:
 3. **ESP8266 (Edge Controller)**: Subscribes to movement commands and controls a servo motor to physically track the detected face.
 4. **Web Dashboard**: Real-time visualization of system status, tracking data, and lock status.
 
+### Topology Diagram
+
+```mermaid
+graph TD
+    subgraph "Local Network (PC Node)"
+        VN["Vision Node (PC)<br/>• Haar + FaceMesh Landmarks<br/>• ArcFace Face Recognition<br/>• MQTT Publisher"]
+    end
+
+    subgraph "Cloud VPS (157.173.101.159)"
+        Broker["MQTT Broker<br/>• Port 1883<br/>• Topic Isolation"]
+        Backend["WebSocket Relay Server<br/>• Node.js Backend<br/>• Port 9002"]
+    end
+
+    subgraph "Edge Controller & IoT Devices"
+        ESP["ESP8266 (Edge Controller)<br/>• Subscribes to Commands<br/>• Drives SG90 Servo"]
+        Servo["SG90 Servo Motor<br/>• 0 to 180 deg Range<br/>• Mounted Camera Control"]
+    end
+
+    subgraph "Monitoring Client"
+        Dash["Web Dashboard (Browser)<br/>• WebSocket Client<br/>• Visualizes Live Tracking Status"]
+    end
+
+    VN -- "Publish: vision/team313/movement" --> Broker
+    VN -- "Publish: vision/team313/heartbeat" --> Broker
+    Broker -- "Deliver published messages" --> Backend
+    Broker -- "Deliver movement commands" --> ESP
+    Backend -- "WebSocket stream" --> Dash
+    ESP -- "Physical PWM Actuation" --> Servo
+    Servo -.->|"Mechanical Feedback (Closed Loop)"| VN
+```
+
+### Sequence Flow Diagram
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Camera as Local Camera
+    participant PC as Vision Node (PC)
+    participant MQTT as MQTT Broker (VPS)
+    participant Backend as Relay Server (VPS)
+    participant Web as Web Dashboard
+    participant ESP as ESP8266 Node
+
+    Camera->>PC: Capture Video Frame
+    rect rgb(19, 19, 31)
+        Note over PC: Haar Bbox Detection
+        Note over PC: MediaPipe 5pt FaceMesh
+        Note over PC: ArcFace Identification
+        Note over PC: Compute Center & Actions
+    end
+    PC->>MQTT: Publish Movement Command (JSON)<br/>Topic: vision/team313/movement
+    PC->>MQTT: Publish Health Status<br/>Topic: vision/team313/heartbeat
+    MQTT->>Backend: Forward Movement Message
+    MQTT->>ESP: Forward Movement Message
+    Backend->>Web: Relay Broadcast over WebSocket (Port 9002)
+    ESP->>ESP: Parse JSON & Check Watchdog Timeout
+    alt Face Detected (MOVE_LEFT / MOVE_RIGHT)
+        ESP->>ESP: Calculate PWM Delta & Adjust Servo
+    else No Face Detected (NO_FACE / Timeout)
+        ESP->>ESP: Run Non-blocking Horizontal Search Sweep
+    end
+    Web->>Web: Render status, active target & target face crop
+```
+
 ## Features
 
 - **Face Recognition & Locking**: Lock onto a specific enrolled identity and track their movements
@@ -94,7 +158,7 @@ npm start
 
 **On PC - Terminal 2 (Vision Node):**
 ```bash
-python src/vision_node.py --broker 157.173.101.159 --name andrew
+
 ```
 
 ### 4. Flash ESP8266

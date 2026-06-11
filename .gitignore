@@ -8,3 +8,6 @@ enroll/
 node_modules/
 *.pdf
 dp.txt
+*.txt
+__pycache__/
+*.pyc
