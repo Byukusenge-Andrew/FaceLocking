@@ -7,6 +7,7 @@ const char* ssid = "CM232_Airtel_4C62";
 const char* password = "1234567890";
 
 
+// const char* mqtt_server = "157.173.101.159"; 
 const char* mqtt_server = "192.168.1.102"; 
 const int mqtt_port = 1883;
 const char* client_id = "esp8266_andrew";
@@ -20,8 +21,8 @@ Servo myServo;
 bool isServoAttached = false;
 unsigned long lastServoMoveTime = 0;
 const unsigned long SERVO_DETACH_TIMEOUT = 1000; // 1 second of inactivity to detach
-const int MIN_ANGLE = 15;   // Minimum servo angle (increase if servo stalls/delays at right end)
-const int MAX_ANGLE = 165;  // Maximum servo angle (decrease if servo stalls/delays at left end)
+const int MIN_ANGLE = 1;   // Minimum servo angle (increase if servo stalls/delays at right end)
+const int MAX_ANGLE = 179;  // Maximum servo angle (decrease if servo stalls/delays at left end)
 
 void attachServo() {
   if (!isServoAttached) {
@@ -56,8 +57,8 @@ const unsigned long LOCAL_SEARCH_TIMEOUT = 5000; // 5 seconds of local search be
 const float LOCAL_SEARCH_RANGE = 20.0; // Search +/- 20 degrees around lastKnownFaceAngle
 
 // --- Tracking Mode Variables ---
-const float TRACKING_STEP = 3.0;      // Tracking step size in degrees (decrease for smoother/slower tracking)
-const float TRACKING_DIRECTION = 1.0; // Tracking direction multiplier (1 or -1). Change to -1 if camera tracks away from you.
+const float TRACKING_STEP = 3.5;      // Tracking step size in degrees (decrease for smoother/slower tracking)
+const float TRACKING_DIRECTION = -1.0; // Tracking direction multiplier (1 or -1). Change to -1 if camera tracks away from you.
 const unsigned long TRACKING_COOLDOWN_MS = 120; // Minimum time between tracking adjustments in ms (prevents latency overshoot)
 
 // --- Oscillation Detection Variables (Anti-Jitter) ---
