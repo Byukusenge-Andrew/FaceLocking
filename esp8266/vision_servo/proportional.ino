@@ -14,7 +14,7 @@ const char* topic_heartbeat = "vision/andrew/heartbeat";
 
 // Servo Configuration
 const int servoPin = D4; 
-int currentAngle = 90;   
+float currentAngle = 90.0;   
 Servo myServo;
 bool isServoAttached = false;
 unsigned long lastServoMoveTime = 0;
@@ -41,18 +41,34 @@ void detachServo() {
 // --- Search Mode Variables ---
 bool isSearching = true;         // Start in search mode by default
 unsigned long lastSweepTime = 0;
-const int SWEEP_INTERVAL = 100;  // Time between sweep steps in ms (increase to slow down sweep)
-const int SWEEP_STEP = 1;        // Sweep step size in degrees
-int sweepStep = SWEEP_STEP;      // Dynamic sweep step
+const int SWEEP_STEP = 1;             // Sweep step size in degrees
+const int FAST_SWEEP_INTERVAL = 30;   // 30ms (33.3 deg/s) for fast full-range sweep
+const int SLOW_SWEEP_INTERVAL = 150;  // 150ms (6.7 deg/s) for slow local recovery search
+int sweepInterval = FAST_SWEEP_INTERVAL; // Dynamic sweep speed interval
+int sweepStep = SWEEP_STEP;           // Dynamic sweep step
+
+// --- Local Search Recovery variables ---
+float lastKnownFaceAngle = 90.0;       // Stores the last angle the face was seen
+bool isLocalSearching = false;         // True if in slow local search mode
+unsigned long localSearchStartTime = 0; // Timestamp when local search started
+const unsigned long LOCAL_SEARCH_TIMEOUT = 5000; // 5 seconds of local search before resuming fast search
+const float LOCAL_SEARCH_RANGE = 20.0; // Search +/- 20 degrees around lastKnownFaceAngle
 
 // --- Tracking Mode Variables ---
-const int MAX_TRACKING_STEP = 8;  // Maximum servo movement in a single update step to prevent jerking
-const int TRACKING_DIRECTION = 1; // Tracking direction multiplier (1 or -1). Change to -1 if camera tracks away from you.
+const float MAX_TRACKING_STEP = 8.0;  // Maximum servo movement in a single update step to prevent jerking
+const float TRACKING_DIRECTION = 1.0; // Tracking direction multiplier (1 or -1). Change to -1 if camera tracks away from you.
 const unsigned long TRACKING_COOLDOWN_MS = 150; // Minimum time between tracking adjustments in ms (prevents latency overshoot)
 
 // --- Watchdog Timer Variables ---
 unsigned long lastFaceDetectTime = 0;
 const unsigned long FACE_TIMEOUT = 2000; // 2 seconds without a face triggers a search
+
+// --- Oscillation Detection Variables (Proportional Anti-Jitter) ---
+int lastSign = 0; // -1, 0, or 1
+unsigned long signChangeTime1 = 0;
+unsigned long signChangeTime2 = 0;
+unsigned long signChangeTime3 = 0;
+const unsigned long OSCILLATION_WINDOW_MS = 1200; // Time window to detect rapid back-and-forth sign switching
 
 WiFiClient espClient;
 PubSubClient client(espClient);
@@ -65,14 +81,14 @@ void setup_wifi() {
   Serial.println("WiFi initialized. Connecting in background...");
 }
 
-void moveServo(int delta) {
-  int oldAngle = currentAngle;
+void moveServo(float delta) {
+  float oldAngle = currentAngle;
   currentAngle += delta;
   if (currentAngle < MIN_ANGLE) currentAngle = MIN_ANGLE;
   if (currentAngle > MAX_ANGLE) currentAngle = MAX_ANGLE;
   
   attachServo();
-  int us = map(currentAngle, 0, 180, 544, 2400); // 544us to 2400us is standard for Servo.h
+  int us = 544 + (int)((currentAngle / 180.0) * (2400 - 544)); // Precise float-to-us mapping
   myServo.writeMicroseconds(us);
   lastServoMoveTime = millis();
   
@@ -146,17 +162,46 @@ void callback(char* topic, byte* payload, unsigned int length) {
   // Parse the commands and update the Watchdog Timer
   if (status == "TRACK") {
     isSearching = false; 
+    isLocalSearching = false;
     lastFaceDetectTime = millis(); // Reset the timer!
+    lastKnownFaceAngle = currentAngle; // Save last known angle
     
-    if (millis() - lastServoMoveTime >= TRACKING_COOLDOWN_MS) {
+    // Determine sign of current delta
+    int currentSign = (delta > 0) ? 1 : ((delta < 0) ? -1 : 0);
+    
+    if (currentSign != 0 && currentSign != lastSign) {
+      signChangeTime3 = signChangeTime2;
+      signChangeTime2 = signChangeTime1;
+      signChangeTime1 = millis();
+      lastSign = currentSign;
+    }
+    
+    bool isOscillating = false;
+    if (signChangeTime3 != 0 && (signChangeTime1 - signChangeTime3 < OSCILLATION_WINDOW_MS)) {
+      isOscillating = true;
+    }
+    
+    if (isOscillating) {
+      Serial.println("Oscillation detected! Damping proportional step size.");
+      delta = delta / 3; // Damp the step heavily to let it settle
+    }
+    
+    if (delta != 0 && (millis() - lastServoMoveTime >= TRACKING_COOLDOWN_MS)) {
       // Clamp individual steps to prevent large sudden jerking
-      int clampedDelta = constrain(delta, -MAX_TRACKING_STEP, MAX_TRACKING_STEP);
+      float clampedDelta = constrain((float)delta, -MAX_TRACKING_STEP, MAX_TRACKING_STEP);
       moveServo(clampedDelta * TRACKING_DIRECTION); 
     }
   } 
   else if (status == "CENTERED") {
     isSearching = false; 
+    isLocalSearching = false;
     lastFaceDetectTime = millis(); // Reset the timer!
+    lastKnownFaceAngle = currentAngle; // Save last known angle
+    // Reset sign change history
+    lastSign = 0;
+    signChangeTime1 = 0;
+    signChangeTime2 = 0;
+    signChangeTime3 = 0;
   } 
   else if (status == "NO_FACE") {
     // Let the watchdog timer handle starting the search after FACE_TIMEOUT (2s)
@@ -184,7 +229,7 @@ void setup() {
   
   // Initialize Servo
   attachServo();
-  int us = map(currentAngle, 0, 180, 544, 2400);
+  int us = 544 + (int)((currentAngle / 180.0) * (2400 - 544));
   myServo.writeMicroseconds(us);
   lastServoMoveTime = millis();
 
@@ -226,26 +271,54 @@ void loop() {
   // If we aren't currently searching, but it's been more than 2 seconds 
   // since we last saw a face, force the system back into search mode.
   if (!isSearching && (millis() - lastFaceDetectTime > FACE_TIMEOUT)) {
-    Serial.println("Face lost! Watchdog triggered. Starting search...");
+    Serial.println("Face lost! Watchdog triggered. Starting slow local search...");
     isSearching = true;
+    isLocalSearching = true;
+    localSearchStartTime = millis();
     lastFaceDetectTime = millis(); // Safeguard to prevent immediate watchdog printing loop
+    sweepInterval = SLOW_SWEEP_INTERVAL;
   }
 
   // --- NON-BLOCKING SEARCH SWEEP ---
   if (isSearching) {
-    if (now - lastSweepTime > SWEEP_INTERVAL) { 
+    // If in local search, check if we have exceeded the local search timeout
+    if (isLocalSearching && (now - localSearchStartTime > LOCAL_SEARCH_TIMEOUT)) {
+      Serial.println("Local search timeout! Resuming fast full-range sweep...");
+      isLocalSearching = false;
+      sweepInterval = FAST_SWEEP_INTERVAL;
+    }
+
+    if (now - lastSweepTime > sweepInterval) { 
       lastSweepTime = now;
       currentAngle += sweepStep;
 
-      if (currentAngle >= MAX_ANGLE) {
-        currentAngle = MAX_ANGLE;
-        sweepStep = -SWEEP_STEP; 
-      } else if (currentAngle <= MIN_ANGLE) {
-        currentAngle = MIN_ANGLE;
-        sweepStep = SWEEP_STEP;  
+      if (isLocalSearching) {
+        // Constrain sweep to lastKnownFaceAngle +/- LOCAL_SEARCH_RANGE
+        float minLocal = lastKnownFaceAngle - LOCAL_SEARCH_RANGE;
+        float maxLocal = lastKnownFaceAngle + LOCAL_SEARCH_RANGE;
+        if (minLocal < MIN_ANGLE) minLocal = MIN_ANGLE;
+        if (maxLocal > MAX_ANGLE) maxLocal = MAX_ANGLE;
+
+        if (currentAngle >= maxLocal) {
+          currentAngle = maxLocal;
+          sweepStep = -SWEEP_STEP;
+        } else if (currentAngle <= minLocal) {
+          currentAngle = minLocal;
+          sweepStep = SWEEP_STEP;
+        }
+      } else {
+        // Full-range sweep
+        if (currentAngle >= MAX_ANGLE) {
+          currentAngle = MAX_ANGLE;
+          sweepStep = -SWEEP_STEP; 
+        } else if (currentAngle <= MIN_ANGLE) {
+          currentAngle = MIN_ANGLE;
+          sweepStep = SWEEP_STEP;  
+        }
       }
+      
       attachServo();
-      int us = map(currentAngle, 0, 180, 544, 2400);
+      int us = 544 + (int)((currentAngle / 180.0) * (2400 - 544));
       myServo.writeMicroseconds(us);
       lastServoMoveTime = millis();
     }

@@ -37,13 +37,24 @@ class HardwareSimulatorGUI:
         self.client_id = f"esp8266_{TEAM_ID}_simulated"
         
         # Simulated Hardware State
-        self.current_angle = 90
+        self.current_angle = 90.0
         self.is_searching = True
         self.sweep_step = SWEEP_STEP
         self.last_face_detect_time = time.time()
         self.last_heartbeat_time = time.time()
         self.heartbeat_count = 0
         self.is_connected = False
+        
+        # Dual-speed Search Recovery variables
+        self.fast_sweep_interval = 0.030 # 30ms in seconds
+        self.slow_sweep_interval = 0.150 # 150ms in seconds
+        self.sweep_interval = self.fast_sweep_interval
+        self.last_sweep_time = 0.0
+        self.last_known_face_angle = 90.0
+        self.is_local_searching = False
+        self.local_search_start_time = 0.0
+        self.local_search_timeout = 5.0 # 5 seconds
+        self.local_search_range = 20.0 # +/- 20 degrees
         
         # Interactive Target Face (initial position)
         self.face_x = 175
@@ -263,20 +274,43 @@ class HardwareSimulatorGUI:
         
         # Parse commands (replicates search watchdog structure in C++ new.ino)
         cmd = "NONE"
-        if "MOVE_LEFT" in payload_str:
-            cmd = "MOVE_LEFT"
+        if "MOVE_LEFT" in payload_str or "MOVE_RIGHT" in payload_str or "CENTERED" in payload_str:
             self.is_searching = False
+            self.is_local_searching = False
             self.last_face_detect_time = time.time()
-            self.move_servo(TRACKING_STEP * TRACKING_DIRECTION)
-        elif "MOVE_RIGHT" in payload_str:
-            cmd = "MOVE_RIGHT"
+            self.last_known_face_angle = self.current_angle
+            
+            if "MOVE_LEFT" in payload_str:
+                cmd = "MOVE_LEFT"
+                self.move_servo(TRACKING_STEP * TRACKING_DIRECTION)
+            elif "MOVE_RIGHT" in payload_str:
+                cmd = "MOVE_RIGHT"
+                self.move_servo(-TRACKING_STEP * TRACKING_DIRECTION)
+            elif "CENTERED" in payload_str:
+                cmd = "CENTERED"
+        elif "TRACK" in payload_str:
             self.is_searching = False
+            self.is_local_searching = False
             self.last_face_detect_time = time.time()
-            self.move_servo(-TRACKING_STEP * TRACKING_DIRECTION)
-        elif "CENTERED" in payload_str:
-            cmd = "CENTERED"
-            self.is_searching = False
-            self.last_face_detect_time = time.time()
+            self.last_known_face_angle = self.current_angle
+            cmd = "TRACK"
+            
+            # Extract delta from JSON
+            delta = 0
+            try:
+                data = json.loads(payload_str)
+                delta = data.get("delta", 0)
+            except Exception:
+                if "delta" in payload_str:
+                    import re
+                    parts = payload_str.split("delta")
+                    match = re.search(r':\s*([-\d]+)', parts[1])
+                    if match:
+                        delta = int(match.group(1))
+            
+            # Clamp step to MAX_TRACKING_STEP = 8
+            clamped_delta = max(-8, min(8, delta))
+            self.move_servo(clamped_delta * TRACKING_DIRECTION)
         elif "NO_FACE" in payload_str:
             cmd = "NO_FACE"
             # Let the watchdog handle starting the search after timeout
@@ -285,16 +319,15 @@ class HardwareSimulatorGUI:
 
     def move_servo(self, delta):
         self.current_angle += delta
-        if self.current_angle < 0:
-            self.current_angle = 0
-        elif self.current_angle > 180:
-            self.current_angle = 180
+        if self.current_angle < 15:
+            self.current_angle = 15
+        elif self.current_angle > 165:
+            self.current_angle = 165
 
     # --- SIMULATION STATE MACHINE TICKER ---
     def update_simulation(self):
         now = time.time()
-        
-        # 1. Check Offline manual tracking calculation
+             # 1. Check Offline manual tracking calculation
         if self.offline_mode:
             # Calculate angle between simulated servo center (180, 240) and target face
             dx = self.face_x - 180
@@ -304,8 +337,10 @@ class HardwareSimulatorGUI:
             target_angle_deg = math.degrees(target_angle_rad)
             
             # Bound and steer servo towards the target face position
-            if target_angle_deg < 0:
-                target_angle_deg = 0 if dx >= 0 else 180
+            if target_angle_deg < 15:
+                target_angle_deg = 15
+            elif target_angle_deg > 165:
+                target_angle_deg = 165
                 
             # Simulate smooth movement tracking step
             if abs(self.current_angle - target_angle_deg) > 2:
@@ -321,18 +356,47 @@ class HardwareSimulatorGUI:
             # 2. Watchdog: Revert to auto searching if face is lost for > 2 seconds
             if not self.is_searching and (now - self.last_face_detect_time > FACE_TIMEOUT):
                 self.is_searching = True
+                self.is_local_searching = True
+                self.local_search_start_time = now
+                self.last_face_detect_time = now # Safeguard to prevent immediate watchdog printing loop
+                self.sweep_interval = self.slow_sweep_interval
                 self.last_cmd = "NO_FACE"
-                self.log("Face lost! Watchdog triggered. Reverting to search sweep...")
+                self.log("Face lost! Watchdog triggered. Starting slow local recovery search...")
             
             # 3. Auto Searching sweep sweep step
             if self.is_searching:
-                self.current_angle += self.sweep_step
-                if self.current_angle >= 180:
-                    self.current_angle = 180
-                    self.sweep_step = -SWEEP_STEP
-                elif self.current_angle <= 0:
-                    self.current_angle = 0
-                    self.sweep_step = SWEEP_STEP
+                # If local searching, check timeout
+                if self.is_local_searching and (now - self.local_search_start_time > self.local_search_timeout):
+                    self.is_local_searching = False
+                    self.sweep_interval = self.fast_sweep_interval
+                    self.log("Local search timeout! Resuming fast full-range sweep...")
+                
+                # Check sweep tick
+                if now - self.last_sweep_time >= self.sweep_interval:
+                    self.last_sweep_time = now
+                    self.current_angle += self.sweep_step
+                    
+                    if self.is_local_searching:
+                        # Sweep within last_known_face_angle +/- LOCAL_SEARCH_RANGE
+                        min_local = self.last_known_face_angle - self.local_search_range
+                        max_local = self.last_known_face_angle + self.local_search_range
+                        if min_local < 15: min_local = 15
+                        if max_local > 165: max_local = 165
+                        
+                        if self.current_angle >= max_local:
+                            self.current_angle = max_local
+                            self.sweep_step = -SWEEP_STEP
+                        elif self.current_angle <= min_local:
+                            self.current_angle = min_local
+                            self.sweep_step = SWEEP_STEP
+                    else:
+                        # Full-range sweep
+                        if self.current_angle >= 165:
+                            self.current_angle = 165
+                            self.sweep_step = -SWEEP_STEP
+                        elif self.current_angle <= 15:
+                            self.current_angle = 15
+                            self.sweep_step = SWEEP_STEP
 
         # 4. Periodic simulated device MQTT Heartbeats (every 5 seconds)
         if now - self.last_heartbeat_time >= 5.0:
@@ -357,15 +421,16 @@ class HardwareSimulatorGUI:
         self.draw_scene()
         self.update_labels()
         
-        # Cycle back in 30ms
-        self.root.after(SWEEP_INTERVAL, self.update_simulation)
+        # Cycle back in 10ms for high-frequency time checking
+        self.root.after(10, self.update_simulation)
 
     def update_labels(self):
         # Update text metrics dynamically
-        self.angle_label.config(text=f"Servo Angle: {self.current_angle}°")
+        self.angle_label.config(text=f"Servo Angle: {self.current_angle:.1f}°")
         
         if self.is_searching:
-            self.mode_label.config(text="System Mode: SEARCHING", fg=self.accent_amber)
+            mode_str = "System Mode: LOCAL SEARCH" if self.is_local_searching else "System Mode: FAST SEARCH"
+            self.mode_label.config(text=mode_str, fg=self.accent_amber)
             self.wd_label.config(text="Face Watchdog: Active (sweeping)", fg="#cbd5e1")
         else:
             self.mode_label.config(text="System Mode: LOCKED & TRACKING", fg=self.accent_green)
@@ -375,7 +440,7 @@ class HardwareSimulatorGUI:
 
         # Update command label
         cmd = getattr(self, "last_cmd", "NONE")
-        if cmd == "CENTERED":
+        if cmd in ("CENTERED", "TRACK"):
             self.command_label.config(text=f"Motor Cmd: {cmd}", fg=self.accent_green)
         elif cmd in ("MOVE_LEFT", "MOVE_RIGHT"):
             self.command_label.config(text=f"Motor Cmd: {cmd}", fg=self.accent_blue)

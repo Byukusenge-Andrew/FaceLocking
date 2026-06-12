@@ -43,7 +43,7 @@ void detachServo() {
 bool isSearching = true;         // Start in search mode by default
 unsigned long lastSweepTime = 0;
 const int SWEEP_STEP = 1;             // Sweep step size in degrees
-const int FAST_SWEEP_INTERVAL = 50;   // 50ms (20 deg/s) for fast full-range sweep
+const int FAST_SWEEP_INTERVAL = 30;   // 30ms (33.3 deg/s) for fast full-range sweep
 const int SLOW_SWEEP_INTERVAL = 150;  // 150ms (6.7 deg/s) for slow local recovery search
 int sweepInterval = FAST_SWEEP_INTERVAL; // Dynamic sweep speed interval
 int sweepStep = SWEEP_STEP;           // Dynamic sweep step
@@ -59,6 +59,15 @@ const float LOCAL_SEARCH_RANGE = 20.0; // Search +/- 20 degrees around lastKnown
 const float TRACKING_STEP = 3.0;      // Tracking step size in degrees (decrease for smoother/slower tracking)
 const float TRACKING_DIRECTION = 1.0; // Tracking direction multiplier (1 or -1). Change to -1 if camera tracks away from you.
 const unsigned long TRACKING_COOLDOWN_MS = 120; // Minimum time between tracking adjustments in ms (prevents latency overshoot)
+
+// --- Oscillation Detection Variables (Anti-Jitter) ---
+String lastMoveDir1 = "";
+String lastMoveDir2 = "";
+String lastMoveDir3 = "";
+unsigned long lastMoveTime1 = 0;
+unsigned long lastMoveTime2 = 0;
+unsigned long lastMoveTime3 = 0;
+const unsigned long OSCILLATION_WINDOW_MS = 1200; // Time window to detect rapid back-and-forth switching
 
 // --- Watchdog Timer Variables ---
 unsigned long lastFaceDetectTime = 0;
@@ -131,22 +140,37 @@ void callback(char* topic, byte* payload, unsigned int length) {
   Serial.println(status);
   
   // Parse the commands and update the Watchdog Timer
-  if (status == "MOVE_LEFT") {
+  if (status == "MOVE_LEFT" || status == "MOVE_RIGHT") {
     isSearching = false; 
     isLocalSearching = false;
     lastFaceDetectTime = millis(); // Reset the timer!
     lastKnownFaceAngle = currentAngle; // Save last known angle
-    if (millis() - lastServoMoveTime >= TRACKING_COOLDOWN_MS) {
-      moveServo(TRACKING_STEP * TRACKING_DIRECTION); // Turn left (e.g. increase angle)
+
+    // Shift movement history when direction changes
+    if (status != lastMoveDir1) {
+      lastMoveDir3 = lastMoveDir2;
+      lastMoveTime3 = lastMoveTime2;
+      lastMoveDir2 = lastMoveDir1;
+      lastMoveTime2 = lastMoveTime1;
+      lastMoveDir1 = status;
+      lastMoveTime1 = millis();
     }
-  } 
-  else if (status == "MOVE_RIGHT") {
-    isSearching = false; 
-    isLocalSearching = false;
-    lastFaceDetectTime = millis(); // Reset the timer!
-    lastKnownFaceAngle = currentAngle; // Save last known angle
-    if (millis() - lastServoMoveTime >= TRACKING_COOLDOWN_MS) {
-      moveServo(-TRACKING_STEP * TRACKING_DIRECTION); // Turn right (e.g. decrease angle)
+
+    bool isOscillating = false;
+    if (lastMoveDir1 != "" && lastMoveDir2 != "" && lastMoveDir3 != "" &&
+        lastMoveDir1 != lastMoveDir2 && lastMoveDir2 != lastMoveDir3 &&
+        (lastMoveTime1 - lastMoveTime3 < OSCILLATION_WINDOW_MS)) {
+      isOscillating = true;
+    }
+
+    if (isOscillating) {
+      Serial.println("Oscillation detected! Holding middle position.");
+      // Do not move: we are already in the middle!
+    } else {
+      if (millis() - lastServoMoveTime >= TRACKING_COOLDOWN_MS) {
+        float delta = (status == "MOVE_LEFT") ? (TRACKING_STEP * TRACKING_DIRECTION) : (-TRACKING_STEP * TRACKING_DIRECTION);
+        moveServo(delta);
+      }
     }
   } 
   else if (status == "CENTERED") {
@@ -154,6 +178,10 @@ void callback(char* topic, byte* payload, unsigned int length) {
     isLocalSearching = false;
     lastFaceDetectTime = millis(); // Reset the timer!
     lastKnownFaceAngle = currentAngle; // Save last known angle
+    // Reset history
+    lastMoveDir1 = "";
+    lastMoveDir2 = "";
+    lastMoveDir3 = "";
   } 
   else if (status == "NO_FACE") {
     // Let the watchdog timer handle starting the search after FACE_TIMEOUT (2s)
