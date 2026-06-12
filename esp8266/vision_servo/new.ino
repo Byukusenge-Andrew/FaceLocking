@@ -47,9 +47,9 @@ const int SWEEP_STEP = 1;        // Sweep step size in degrees
 int sweepStep = SWEEP_STEP;      // Dynamic sweep step
 
 // --- Tracking Mode Variables ---
-const float TRACKING_STEP = 1.5;      // Tracking step size in degrees (decrease for smoother/slower tracking)
+const float TRACKING_STEP = 3.0;      // Tracking step size in degrees (decrease for smoother/slower tracking)
 const float TRACKING_DIRECTION = 1.0; // Tracking direction multiplier (1 or -1). Change to -1 if camera tracks away from you.
-const unsigned long TRACKING_COOLDOWN_MS = 150; // Minimum time between tracking adjustments in ms (prevents latency overshoot)
+const unsigned long TRACKING_COOLDOWN_MS = 120; // Minimum time between tracking adjustments in ms (prevents latency overshoot)
 
 // --- Watchdog Timer Variables ---
 unsigned long lastFaceDetectTime = 0;

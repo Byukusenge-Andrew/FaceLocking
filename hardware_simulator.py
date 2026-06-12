@@ -26,7 +26,7 @@ TOPIC_HEARTBEAT = f"vision/{TEAM_ID}/heartbeat"
 FACE_TIMEOUT = 2.0  # 2 seconds without a face triggers search mode (watchdog)
 SWEEP_INTERVAL = 100  # 100ms sweep step in search mode (in ms)
 SWEEP_STEP = 1
-TRACKING_STEP = 1.5
+TRACKING_STEP = 3.0
 TRACKING_DIRECTION = 1
 
 class HardwareSimulatorGUI:
