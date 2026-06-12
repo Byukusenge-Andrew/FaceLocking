@@ -6,7 +6,7 @@
 const char* ssid = "CM232_Airtel_4C62";
 const char* password = "1234567890";
 
-const char* mqtt_server = "157.173.101.159"; 
+const char* mqtt_server = "192.168.1.102"; 
 const int mqtt_port = 1883;
 const char* client_id = "esp8266_andrew";
 const char* topic_movement = "vision/andrew/movement";

@@ -663,7 +663,7 @@ class HardwareSimulatorGUI:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="GUI ESP8266 and Servo hardware simulator.")
-    parser.add_argument("--broker", type=str, default="157.173.101.159", help="MQTT Broker IP address")
+    parser.add_argument("--broker", type=str, default="192.168.1.102", help="MQTT Broker IP address")
     parser.add_argument("--port", type=int, default=1883, help="MQTT Broker Port")
     args = parser.parse_args()
     
