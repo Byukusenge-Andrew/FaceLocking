@@ -56,6 +56,21 @@ class HardwareSimulatorGUI:
         self.local_search_timeout = 5.0 # 5 seconds
         self.local_search_range = 20.0 # +/- 20 degrees
         
+        # Oscillation tracking for simulator
+        self.last_move_dir1 = ""
+        self.last_move_dir2 = ""
+        self.last_move_dir3 = ""
+        self.last_move_time1 = 0.0
+        self.last_move_time2 = 0.0
+        self.last_move_time3 = 0.0
+        self.oscillation_window = 1.2 # 1.2 seconds
+        
+        # Proportional oscillation tracking for simulator
+        self.last_sign = 0
+        self.sign_change_time1 = 0.0
+        self.sign_change_time2 = 0.0
+        self.sign_change_time3 = 0.0
+        
         # Interactive Target Face (initial position)
         self.face_x = 175
         self.face_y = 60
@@ -274,20 +289,51 @@ class HardwareSimulatorGUI:
         
         # Parse commands (replicates search watchdog structure in C++ new.ino)
         cmd = "NONE"
-        if "MOVE_LEFT" in payload_str or "MOVE_RIGHT" in payload_str or "CENTERED" in payload_str:
+        if "MOVE_LEFT" in payload_str or "MOVE_RIGHT" in payload_str:
             self.is_searching = False
             self.is_local_searching = False
             self.last_face_detect_time = time.time()
             self.last_known_face_angle = self.current_angle
             
-            if "MOVE_LEFT" in payload_str:
-                cmd = "MOVE_LEFT"
-                self.move_servo(TRACKING_STEP * TRACKING_DIRECTION)
-            elif "MOVE_RIGHT" in payload_str:
-                cmd = "MOVE_RIGHT"
-                self.move_servo(-TRACKING_STEP * TRACKING_DIRECTION)
-            elif "CENTERED" in payload_str:
+            status = "MOVE_LEFT" if "MOVE_LEFT" in payload_str else "MOVE_RIGHT"
+            
+            # Shift history
+            if status != self.last_move_dir1:
+                self.last_move_dir3 = self.last_move_dir2
+                self.last_move_time3 = self.last_move_time2
+                self.last_move_dir2 = self.last_move_dir1
+                self.last_move_time2 = self.last_move_time1
+                self.last_move_dir1 = status
+                self.last_move_time1 = time.time()
+                
+            is_oscillating = False
+            if (self.last_move_dir1 and self.last_move_dir2 and self.last_move_dir3 and
+                self.last_move_dir1 != self.last_move_dir2 and self.last_move_dir2 != self.last_move_dir3 and
+                (self.last_move_time1 - self.last_move_time3 < self.oscillation_window)):
+                is_oscillating = True
+                
+            if is_oscillating:
                 cmd = "CENTERED"
+                self.last_cmd = "CENTERED (Oscillation Damped)"
+                self.log("Oscillation detected! Damping movement, holding middle.")
+            else:
+                cmd = status
+                if status == "MOVE_LEFT":
+                    self.move_servo(TRACKING_STEP * TRACKING_DIRECTION)
+                else:
+                    self.move_servo(-TRACKING_STEP * TRACKING_DIRECTION)
+                    
+        elif "CENTERED" in payload_str:
+            cmd = "CENTERED"
+            self.is_searching = False
+            self.is_local_searching = False
+            self.last_face_detect_time = time.time()
+            self.last_known_face_angle = self.current_angle
+            # Reset history
+            self.last_move_dir1 = ""
+            self.last_move_dir2 = ""
+            self.last_move_dir3 = ""
+            
         elif "TRACK" in payload_str:
             self.is_searching = False
             self.is_local_searching = False
@@ -308,12 +354,28 @@ class HardwareSimulatorGUI:
                     if match:
                         delta = int(match.group(1))
             
-            # Clamp step to MAX_TRACKING_STEP = 8
-            clamped_delta = max(-8, min(8, delta))
-            self.move_servo(clamped_delta * TRACKING_DIRECTION)
+            # Sign tracking for simulation of proportional damping
+            current_sign = 1 if delta > 0 else (-1 if delta < 0 else 0)
+            if current_sign != 0 and current_sign != self.last_sign:
+                self.sign_change_time3 = self.sign_change_time2
+                self.sign_change_time2 = self.sign_change_time1
+                self.sign_change_time1 = time.time()
+                self.last_sign = current_sign
+                
+            is_oscillating = False
+            if self.sign_change_time3 > 0.0 and (self.sign_change_time1 - self.sign_change_time3 < self.oscillation_window):
+                is_oscillating = True
+                
+            if is_oscillating:
+                delta = int(delta / 3)
+                self.log("Proportional oscillation detected! Damping delta step size.")
+                
+            if delta != 0:
+                clamped_delta = max(-8, min(8, delta))
+                self.move_servo(clamped_delta * TRACKING_DIRECTION)
+                
         elif "NO_FACE" in payload_str:
             cmd = "NO_FACE"
-            # Let the watchdog handle starting the search after timeout
             
         self.last_cmd = cmd
 
