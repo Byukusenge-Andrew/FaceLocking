@@ -145,11 +145,14 @@ class FaceLockSystem:
         # Tracking properties
         self.last_target_box = None
         self.verify_counter = 0
+        self.last_similarity = 0.0
         
         # We need to store the session file name
         ts = time.strftime("%Y%m%d%H%M%S")
         safe_name = "".join(c for c in target_name if c.isalnum())
-        self.history_file = Path(f"{safe_name}_history_{ts}.txt")
+        log_dir = Path("logs") / safe_name
+        log_dir.mkdir(parents=True, exist_ok=True)
+        self.history_file = log_dir / f"{safe_name}_history_{ts}.txt"
         
         print(f"[FaceLock] Initialized. Target: {target_name}. Log: {self.history_file}")
 
@@ -213,8 +216,8 @@ class FaceLockSystem:
                     else:
                         target_sim = mr.similarity
                 else:
-                    # Keep track with high/placeholder similarity
-                    target_sim = 1.0
+                    # Keep track with last known similarity (or fallback to 1.0 if not set yet)
+                    target_sim = self.last_similarity if self.last_similarity > 0.0 else 1.0
 
         # Run ArcFace search if target is not found/tracked yet
         if target_face is None:
@@ -283,7 +286,7 @@ class FaceLockSystem:
                 cv2.rectangle(vis, (f.x1, f.y1), (f.x2, f.y2), (0, 255, 0), 3)
                 cv2.putText(
                     vis,
-                    f"TARGET: {self.target_name}",
+                    f"TARGET: {self.target_name} ({self.last_similarity:.2f})",
                     (f.x1, f.y1 - 10),
                     cv2.FONT_HERSHEY_SIMPLEX,
                     0.6,
@@ -311,17 +314,19 @@ class FaceLockSystem:
 
                     if best_lm and min_dist < max(f.x2 - f.x1, f.y2 - f.y1):
                         actions = self.action_det.detect(best_lm, W, H)
+                        y_offset = H - 40
                         for atype, desc in actions:
                             self.log_action(atype, desc)
                             cv2.putText(
                                 vis,
                                 f"ACT: {atype}",
-                                (10, H - 40),
+                                (10, y_offset),
                                 cv2.FONT_HERSHEY_SIMPLEX,
                                 0.7,
                                 (0, 255, 255),
                                 2
                             )
+                            y_offset -= 30
             else:
                 # Target not found this frame
                 self.lost_frames += 1
@@ -349,6 +354,7 @@ class FaceLockSystem:
                     self.last_target_box = None
                     self.log_action("LOCK_LOST", "Target disappeared")
 
+        self.last_similarity = target_sim if target_face is not None else 0.0
         return vis, target_face
 
 

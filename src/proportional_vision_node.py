@@ -1,8 +1,7 @@
 """
-vision_node.py
-Simulated Vision Node for Distributed Vision-Control System.
-Tracks face and publishes movement commands via MQTT.
-Topic: vision/team313/movement
+proportional_vision_node.py
+Tracks face and publishes proportional movement commands (delta angles) via MQTT.
+Topic: vision/andrew/movement
 """
 
 import time
@@ -30,10 +29,10 @@ TEAM_ID = "andrew"
 TOPIC_MOVEMENT = f"vision/{TEAM_ID}/movement"
 TOPIC_HEARTBEAT = f"vision/{TEAM_ID}/heartbeat"
 
-class VisionNode:
+class ProportionalVisionNode:
     def __init__(self, broker, port, target_name):
         # MQTT Setup
-        self.client = mqtt.Client(client_id=f"{TEAM_ID}_vision_node")
+        self.client = mqtt.Client(client_id=f"{TEAM_ID}_vision_node_proportional")
         self.client.on_connect = self.on_connect
         self.client.connect(broker, port, 60)
         self.client.loop_start()
@@ -66,9 +65,10 @@ class VisionNode:
         print(f"Connected to MQTT Broker with result code {rc}")
         self.publish_heartbeat()
 
-    def publish_movement(self, status, confidence=1.0, target=None, locked=False, face_image=None):
+    def publish_movement(self, status, delta=0, confidence=1.0, target=None, locked=False, face_image=None):
         payload = {
             "status": status,
+            "delta": delta,
             "confidence": confidence,
             "target": target,
             "locked": locked,
@@ -81,25 +81,25 @@ class VisionNode:
             payload["face_image"] = base64.b64encode(buffer).decode('utf-8')
         
         self.client.publish(self.mqtt_topic, json.dumps(payload))
-        print(f"Published: {status} | Target: {target} (conf: {confidence:.2f}) | Image: {'yes' if face_image is not None else 'no'}")
+        print(f"Published: {status} | Delta: {delta:+} | Target: {target} (conf: {confidence:.2f})")
         
-        # Log published motor commands with speaker ID, confidence and timestamp
-        self.system.log_action("MOTOR_CMD", f"cmd={status} | target={target} | conf={confidence:.2f}")
+        # Log published motor commands
+        self.system.log_action("MOTOR_CMD", f"cmd={status} | delta={delta} | target={target} | conf={confidence:.2f}")
 
     def publish_heartbeat(self):
         payload = {
-            "node": "pc_vision",
+            "node": "pc_vision_proportional",
             "status": "ONLINE",
             "timestamp": time.time()
         }
         self.client.publish(TOPIC_HEARTBEAT, json.dumps(payload))
 
     def run(self):
-        cap = cv2.VideoCapture(1) # Use default camera
+        cap = cv2.VideoCapture(1) # Use camera index 1
         if not cap.isOpened():
-             cap = cv2.VideoCapture(1)
+             cap = cv2.VideoCapture(0)
         
-        print(f"Vision Node Started. Tracking target: {self.system.target_name}")
+        print(f"Proportional Vision Node Started. Tracking target: {self.system.target_name}")
         print(f"Publishing to {TOPIC_MOVEMENT}")
         
         while self.running:
@@ -111,41 +111,45 @@ class VisionNode:
             H, W = frame.shape[:2]
             
             # Process Frame using FaceLockSystem
-            # Note: process_frame now returns (vis_frame, target_face_obj)
             vis, target_face = self.system.process_frame(frame, self.embedder)
             
             status = "NO_FACE"
+            delta = 0
             face_crop = None
             
             if target_face:
-                # Target is found and locked
                 f = target_face
                 
                 # Extract face crop for dashboard (only if not sent yet)
                 if not self.snapshot_sent:
                     x1, y1, x2, y2 = int(f.x1), int(f.y1), int(f.x2), int(f.y2)
-                    # Add padding
                     pad = 20
                     x1 = max(0, x1 - pad)
                     y1 = max(0, y1 - pad)
                     x2 = min(W, x2 + pad)
                     y2 = min(H, y2 + pad)
                     face_crop = frame[y1:y2, x1:x2]
-                    self.snapshot_sent = True  # Mark as sent
-                    print("📸 Face snapshot captured and will be sent")
+                    self.snapshot_sent = True
+                    print("📸 Face snapshot captured")
                 
                 # Calculate Center
                 cx = (f.x1 + f.x2) / 2.0
                 cx_norm = cx / W
                 
-                # Movement Logic
-                # Deadband: 0.4 to 0.6 is CENTERED
-                if cx_norm < 0.4:
-                    status = "MOVE_LEFT"
-                elif cx_norm > 0.6:
-                    status = "MOVE_RIGHT"
-                else:
+                # Proportional distance calculation:
+                # error ranges from -0.5 (far left) to +0.5 (far right)
+                error = cx_norm - 0.5
+                
+                # Deadband (if error is within 5% of center, consider it CENTERED)
+                if abs(error) <= 0.05:
                     status = "CENTERED"
+                    delta = 0
+                else:
+                    status = "TRACK"
+                    # Proportional Gain: Kp maps normalized error [-0.5, 0.5] to angle adjustments.
+                    # At error = 0.5, max correction is 0.5 * 30 = 15 degrees.
+                    Kp = 30.0
+                    delta = int(error * Kp)
             else:
                 # No face detected - reset snapshot flag
                 if self.snapshot_sent:
@@ -158,6 +162,7 @@ class VisionNode:
                 is_locked = (status != "NO_FACE")
                 self.publish_movement(
                     status,
+                    delta=delta,
                     confidence=self.system.last_similarity,
                     target=self.system.target_name,
                     locked=is_locked,
@@ -170,7 +175,7 @@ class VisionNode:
                 self.publish_heartbeat()
                 self.last_heartbeat = time.time()
             
-            # Overlay movement status in Python UI (only when target is found to avoid overlapping recovery texts)
+            # Overlay status in Python UI
             if target_face:
                 cv2.putText(
                     vis,
@@ -184,7 +189,7 @@ class VisionNode:
                 status_color = (0, 255, 0) if status == "CENTERED" else (255, 0, 0)
                 cv2.putText(
                     vis,
-                    f"STATUS: {status}",
+                    f"STATUS: {status} | Delta: {delta:+}",
                     (10, 60),
                     cv2.FONT_HERSHEY_SIMPLEX,
                     0.7,
@@ -192,7 +197,7 @@ class VisionNode:
                     2
                 )
             
-            cv2.imshow("Vision Node (Locked)", vis)
+            cv2.imshow("Proportional Vision Node (Locked)", vis)
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
         
@@ -206,5 +211,5 @@ if __name__ == "__main__":
     parser.add_argument("--name", type=str, default="andrew", help="Target name to lock onto")
     args = parser.parse_args()
 
-    node = VisionNode(args.broker, PORT, args.name)
+    node = ProportionalVisionNode(args.broker, PORT, args.name)
     node.run()

@@ -8,7 +8,7 @@ const path = require('path');
 // On VPS, we connect to local mosquitto. On PC, we might want to connect to VPS IP?
 // For Backend (running on VPS), it should connect to localhost (its own mosquitto).
 const MQTT_BROKER = 'mqtt://157.173.101.159';
-const TEAM_ID = 'team313';
+const TEAM_ID = 'andrew';
 const MQTT_TOPIC_VS = `vision/${TEAM_ID}/movement`;
 const WS_PORT = 9002;
 const HTTP_PORT = 8080; // Port for Dashboard HTML
@@ -28,9 +28,31 @@ mqttClient.on('connect', () => {
     });
 });
 
+let lastMovementMessage = null;
+
 mqttClient.on('message', (topic, message) => {
     const msgString = message.toString();
     console.log(`MQTT IN [${topic}]: ${msgString}`);
+
+    try {
+        const data = JSON.parse(msgString);
+        if (data.status) {
+            if (data.face_image) {
+                lastMovementMessage = msgString;
+            } else if (lastMovementMessage && data.locked) {
+                const cachedData = JSON.parse(lastMovementMessage);
+                cachedData.status = data.status;
+                cachedData.confidence = data.confidence;
+                cachedData.locked = data.locked;
+                cachedData.timestamp = data.timestamp;
+                lastMovementMessage = JSON.stringify(cachedData);
+            } else if (!data.locked) {
+                lastMovementMessage = null;
+            }
+        }
+    } catch (e) {
+        console.error('Error handling cache:', e);
+    }
 
     // Broadcast to all WS clients
     broadcast(msgString);
@@ -46,6 +68,10 @@ wss.on('connection', (ws) => {
 
     // Send initial status
     ws.send(JSON.stringify({ type: 'STATUS', message: 'Connected to Vision Backend' }));
+
+    if (lastMovementMessage) {
+        ws.send(lastMovementMessage);
+    }
 
     ws.on('close', () => {
         console.log('Client disconnected');

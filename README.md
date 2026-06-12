@@ -123,11 +123,18 @@ Face_recognition_with_Arcface/
 │   └── index.html           # Real-time web dashboard
 ├── esp8266/
 │   └── vision_servo/
-│       └── vision_servo.ino # Arduino firmware for ESP8266
+│       └── new.ino          # Arduino non-blocking firmware
+├── blender/
+│   ├── blender_setup_generator.py # Programmatic Blender setup script
+│   └── tracking.blend       # 3D tracking tracking layout
+├── docs/
+│   ├── dp.txt               # Deployment guides and settings
+│   └── Assignment_ Distributed Vision-Control System (Face-Locked Servo)-2.pdf
 ├── data/
 │   └── db/                  # Face database (face_db.npz)
-└── models/
-    └── embedder_arcface.onnx
+├── models/
+│   └── embedder_arcface.onnx
+└── hardware_simulator.py    # Hardware mock/simulator for testing
 ```
 
 ## Quick Start
@@ -196,3 +203,11 @@ The new Face Locking feature (`src/face_locking.py` and `vision_node.py`) allows
 
 **History**:
 A file named `<name>_history_<timestamp>.txt` is created to record all detected actions.
+
+## Hardware Simulator (Mock ESP8266 + Servo)
+If you do not have physical hardware (ESP8266 board, SG90 servo) available, you can run the simulator tool locally. It connects to the MQTT broker, handles movement calculations, runs the sweeping pattern when no face is found, triggers the 2-second face-lost watchdog, and prints a real-time ASCII tracking dashboard in your terminal.
+
+To run:
+```bash
+python hardware_simulator.py --broker 157.173.101.159
+```

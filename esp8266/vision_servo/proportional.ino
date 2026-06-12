@@ -6,7 +6,6 @@
 const char* ssid = "CM232_Airtel_4C62";
 const char* password = "1234567890";
 
-
 const char* mqtt_server = "157.173.101.159"; 
 const int mqtt_port = 1883;
 const char* client_id = "esp8266_andrew";
@@ -15,7 +14,7 @@ const char* topic_heartbeat = "vision/andrew/heartbeat";
 
 // Servo Configuration
 const int servoPin = D4; 
-float currentAngle = 90.0;   
+int currentAngle = 90;   
 Servo myServo;
 bool isServoAttached = false;
 unsigned long lastServoMoveTime = 0;
@@ -47,8 +46,8 @@ const int SWEEP_STEP = 1;        // Sweep step size in degrees
 int sweepStep = SWEEP_STEP;      // Dynamic sweep step
 
 // --- Tracking Mode Variables ---
-const float TRACKING_STEP = 1.5;      // Tracking step size in degrees (decrease for smoother/slower tracking)
-const float TRACKING_DIRECTION = 1.0; // Tracking direction multiplier (1 or -1). Change to -1 if camera tracks away from you.
+const int MAX_TRACKING_STEP = 8;  // Maximum servo movement in a single update step to prevent jerking
+const int TRACKING_DIRECTION = 1; // Tracking direction multiplier (1 or -1). Change to -1 if camera tracks away from you.
 const unsigned long TRACKING_COOLDOWN_MS = 150; // Minimum time between tracking adjustments in ms (prevents latency overshoot)
 
 // --- Watchdog Timer Variables ---
@@ -66,14 +65,14 @@ void setup_wifi() {
   Serial.println("WiFi initialized. Connecting in background...");
 }
 
-void moveServo(float delta) {
-  float oldAngle = currentAngle;
+void moveServo(int delta) {
+  int oldAngle = currentAngle;
   currentAngle += delta;
   if (currentAngle < MIN_ANGLE) currentAngle = MIN_ANGLE;
   if (currentAngle > MAX_ANGLE) currentAngle = MAX_ANGLE;
   
   attachServo();
-  int us = 544 + (int)((currentAngle / 180.0) * (2400 - 544)); // Precise float-to-us mapping
+  int us = map(currentAngle, 0, 180, 544, 2400); // 544us to 2400us is standard for Servo.h
   myServo.writeMicroseconds(us);
   lastServoMoveTime = millis();
   
@@ -112,28 +111,47 @@ void callback(char* topic, byte* payload, unsigned int length) {
 
   // Fallback to substring matching if status not found in JSON
   if (status == "") {
-    if (message.indexOf("MOVE_LEFT") >= 0) status = "MOVE_LEFT";
-    else if (message.indexOf("MOVE_RIGHT") >= 0) status = "MOVE_RIGHT";
+    if (message.indexOf("TRACK") >= 0) status = "TRACK";
     else if (message.indexOf("CENTERED") >= 0) status = "CENTERED";
     else if (message.indexOf("NO_FACE") >= 0) status = "NO_FACE";
   }
 
+  // Extract "delta" value from simple JSON format {"delta": VALUE, ...}
+  int delta = 0;
+  int deltaIndex = message.indexOf("\"delta\"");
+  if (deltaIndex >= 0) {
+    int colonIndex = message.indexOf(":", deltaIndex);
+    if (colonIndex >= 0) {
+      int numStart = colonIndex + 1;
+      while (numStart < message.length() && (message[numStart] == ' ' || message[numStart] == ':')) {
+        numStart++;
+      }
+      int numEnd = numStart;
+      while (numEnd < message.length() && message[numEnd] != ',' && message[numEnd] != '}') {
+        numEnd++;
+      }
+      if (numEnd > numStart) {
+        String numStr = message.substring(numStart, numEnd);
+        numStr.trim();
+        delta = numStr.toInt();
+      }
+    }
+  }
+
   Serial.print("Parsed status: ");
-  Serial.println(status);
+  Serial.print(status);
+  Serial.print(" | Parsed delta: ");
+  Serial.println(delta);
   
   // Parse the commands and update the Watchdog Timer
-  if (status == "MOVE_LEFT") {
+  if (status == "TRACK") {
     isSearching = false; 
     lastFaceDetectTime = millis(); // Reset the timer!
+    
     if (millis() - lastServoMoveTime >= TRACKING_COOLDOWN_MS) {
-      moveServo(TRACKING_STEP * TRACKING_DIRECTION); // Turn left (e.g. increase angle)
-    }
-  } 
-  else if (status == "MOVE_RIGHT") {
-    isSearching = false; 
-    lastFaceDetectTime = millis(); // Reset the timer!
-    if (millis() - lastServoMoveTime >= TRACKING_COOLDOWN_MS) {
-      moveServo(-TRACKING_STEP * TRACKING_DIRECTION); // Turn right (e.g. decrease angle)
+      // Clamp individual steps to prevent large sudden jerking
+      int clampedDelta = constrain(delta, -MAX_TRACKING_STEP, MAX_TRACKING_STEP);
+      moveServo(clampedDelta * TRACKING_DIRECTION); 
     }
   } 
   else if (status == "CENTERED") {
@@ -166,7 +184,7 @@ void setup() {
   
   // Initialize Servo
   attachServo();
-  int us = 544 + (int)((currentAngle / 180.0) * (2400 - 544));
+  int us = map(currentAngle, 0, 180, 544, 2400);
   myServo.writeMicroseconds(us);
   lastServoMoveTime = millis();
 
@@ -227,7 +245,7 @@ void loop() {
         sweepStep = SWEEP_STEP;  
       }
       attachServo();
-      int us = 544 + (int)((currentAngle / 180.0) * (2400 - 544));
+      int us = map(currentAngle, 0, 180, 544, 2400);
       myServo.writeMicroseconds(us);
       lastServoMoveTime = millis();
     }
@@ -242,7 +260,7 @@ void loop() {
   static unsigned long lastHeartbeat = 0;
   if (now - lastHeartbeat > 5000) {
     lastHeartbeat = now;
-    String heartbeat = "{\"node\": \"esp8266\", \"status\": \"ONLINE\"}";
+    String heartbeat = "{\"node\": \"esp8266_proportional\", \"status\": \"ONLINE\"}";
     client.publish(topic_heartbeat, heartbeat.c_str());
   }
 }

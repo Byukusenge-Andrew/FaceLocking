@@ -5,177 +5,367 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>S.A.R.A. System Dashboard</title>
-    <!-- Use Google Fonts for premium look -->
-    <link
-        href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Roboto:wght@300;400;700&display=swap"
-        rel="stylesheet">
+    <!-- Modern high-end fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
-            --primary-bg: #0a0a12;
-            --panel-bg: #13131f;
-            --accent-color: #00d4ff;
-            /* Neon Blue */
-            --alert-color: #ff0055;
-            /* Neon Red */
-            --success-color: #00ff9d;
-            /* Neon Green */
-            --text-color: #e0e0e0;
+            --bg-primary: #09090b;       /* Zinc 950 */
+            --bg-secondary: #18181b;     /* Zinc 900 */
+            --border-color: #27272a;     /* Zinc 800 */
+            --border-hover: #3f3f46;     /* Zinc 700 */
+            --text-primary: #f4f4f5;     /* Zinc 100 */
+            --text-secondary: #a1a1aa;   /* Zinc 400 */
+            --text-muted: #71717a;       /* Zinc 500 */
+            
+            /* Curated, professional flat color accents (no neon glow/glare) */
+            --accent-blue: #3b82f6;      /* Blue 500 */
+            --accent-green: #10b981;     /* Emerald 500 */
+            --accent-red: #f43f5e;       /* Rose 500 */
+            --accent-yellow: #f59e0b;    /* Amber 500 */
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            transition: background-color 0.2s ease, border-color 0.2s ease;
         }
 
         body {
-            background-color: var(--primary-bg);
-            color: var(--text-color);
-            font-family: 'Roboto', sans-serif;
-            margin: 0;
-            padding: 0;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            min-height: 100vh;
             display: flex;
             flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            min-height: 100vh;
-            overflow: hidden;
+            overflow-x: hidden;
+            letter-spacing: -0.01em;
         }
 
-        /* Ambient Background */
-        body::before {
-            content: "";
+        /* Glassmorphic Minimalist Header */
+        header {
+            width: 100%;
+            padding: 16px 24px;
+            background: rgba(24, 24, 27, 0.75);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border-color);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header-title-group h1 {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            font-size: 1.15rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .header-title-group h1::before {
+            content: '';
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: var(--accent-blue);
+        }
+
+        .header-subtitle {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-top: 2px;
+            font-weight: 500;
+        }
+
+        .connection-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            background: rgba(39, 39, 42, 0.5);
+            padding: 6px 12px;
+            border-radius: 9999px;
+            border: 1px solid var(--border-color);
+        }
+
+        .status-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background-color: var(--text-muted);
+        }
+
+        .status-dot.active {
+            background-color: var(--accent-green);
+        }
+
+        .status-dot.inactive {
+            background-color: var(--accent-red);
+        }
+
+        /* Dashboard Container Layout */
+        .container {
+            max-width: 1200px;
+            width: 100%;
+            margin: 24px auto;
+            padding: 0 24px;
+            display: grid;
+            grid-template-columns: repeat(12, 1fr);
+            gap: 20px;
+            flex-grow: 1;
+        }
+
+        /* Flat Modern Cards */
+        .card {
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        .card:hover {
+            border-color: var(--border-hover);
+        }
+
+        .card-title {
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-secondary);
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        /* 3-Column Grid Distribution */
+        .col-4 {
+            grid-column: span 4;
+        }
+
+        .col-12 {
+            grid-column: span 12;
+        }
+
+        @media (max-width: 900px) {
+            .col-4 {
+                grid-column: span 12;
+            }
+        }
+
+        /* Face Preview Layout (Persisted) */
+        .face-box-wrapper {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 1 / 1;
+            max-height: 280px;
+            border-radius: 6px;
+            overflow: hidden;
+            background: #0f0f11;
+            border: 1px solid rgba(255, 255, 255, 0.03);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: auto;
+        }
+
+        #face-image {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: none;
+        }
+
+        .placeholder-text {
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            font-weight: 500;
+            text-align: center;
+        }
+
+        /* Interactive Manual Hover Overlay (No auto-downloads) */
+        .face-overlay {
             position: absolute;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            background: radical-gradient(circle at 50% 50%, rgba(0, 212, 255, 0.05), transparent 70%);
-            z-index: -1;
+            background: rgba(9, 9, 11, 0.85);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+            pointer-events: none;
         }
 
-        header {
-            width: 100%;
-            padding: 20px;
-            text-align: center;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-            background: rgba(19, 19, 31, 0.8);
-            backdrop-filter: blur(10px);
-            position: fixed;
-            top: 0;
+        .face-box-wrapper:hover .face-overlay.active {
+            opacity: 1;
+            pointer-events: auto;
         }
 
-        h1 {
-            font-family: 'Orbitron', sans-serif;
-            margin: 0;
-            color: var(--accent-color);
-            text-transform: uppercase;
-            letter-spacing: 2px;
-            text-shadow: 0 0 10px rgba(0, 212, 255, 0.5);
+        .btn-download {
+            background-color: var(--text-primary);
+            color: var(--bg-primary);
+            border: none;
+            padding: 8px 16px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            border-radius: 4px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: transform 0.1s ease;
         }
 
-        .container {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 20px;
-            width: 90%;
-            max-width: 1200px;
-            margin-top: 100px;
+        .btn-download:hover {
+            transform: scale(1.03);
         }
 
-        .card {
-            background: var(--panel-bg);
-            border-radius: 12px;
-            padding: 25px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
-            border: 1px solid rgba(255, 255, 255, 0.05);
-            text-align: center;
-            transition: transform 0.3s ease;
-        }
-
-        .card:hover {
-            transform: translateY(-5px);
-            border-color: var(--accent-color);
-        }
-
-        .card h2 {
-            font-family: 'Orbitron', sans-serif;
-            font-size: 1.2rem;
-            color: rgba(255, 255, 255, 0.7);
-            margin-bottom: 20px;
-        }
-
-        .value {
-            font-size: 2.5rem;
+        /* Metric Details */
+        .metric-value {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            font-size: 1.8rem;
             font-weight: 700;
-            margin: 10px 0;
+            line-height: 1.2;
+            color: var(--text-primary);
+            margin-bottom: 6px;
         }
 
-        #movement-status {
-            color: var(--success-color);
+        .metric-sub {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            font-weight: 500;
         }
 
-        #timestamp {
-            font-size: 1.5rem;
-            color: #888;
-        }
-
-        #connection-status {
-            font-size: 1.2rem;
-            color: #888;
-        }
-
-        /* Status Indicators */
-        .status-badge {
-            display: inline-block;
-            padding: 5px 12px;
-            border-radius: 20px;
-            font-weight: bold;
-            font-size: 0.9rem;
+        /* Color-coded Status pills */
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 4px 10px;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
             text-transform: uppercase;
+            letter-spacing: 0.02em;
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text-primary);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            width: fit-content;
         }
 
-        .connected {
-            background: rgba(0, 255, 157, 0.1);
-            color: var(--success-color);
-            border: 1px solid var(--success-color);
+        .badge-searching {
+            background: rgba(245, 158, 11, 0.1);
+            color: var(--accent-yellow);
+            border-color: rgba(245, 158, 11, 0.2);
         }
 
-        .disconnected {
-            background: rgba(255, 0, 85, 0.1);
-            color: var(--alert-color);
-            border: 1px solid var(--alert-color);
+        .badge-locked {
+            background: rgba(59, 130, 246, 0.1);
+            color: var(--accent-blue);
+            border-color: rgba(59, 130, 246, 0.2);
         }
 
-        /* Animation for movement */
-        @keyframes pulse {
+        .badge-centered {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--accent-green);
+            border-color: rgba(16, 185, 129, 0.2);
+        }
+
+        .badge-lost {
+            background: rgba(244, 63, 94, 0.1);
+            color: var(--accent-red);
+            border-color: rgba(244, 63, 94, 0.2);
+        }
+
+        .badge-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            margin-right: 6px;
+            display: inline-block;
+        }
+
+        .badge-searching .badge-dot {
+            background-color: var(--accent-yellow);
+            animation: badge-pulse 1.5s infinite ease-in-out;
+        }
+
+        .badge-locked .badge-dot {
+            background-color: var(--accent-blue);
+        }
+
+        .badge-centered .badge-dot {
+            background-color: var(--accent-green);
+        }
+
+        .badge-lost .badge-dot {
+            background-color: var(--accent-red);
+        }
+
+        @keyframes badge-pulse {
             0% {
-                transform: scale(1);
-                box-shadow: 0 0 0 0 rgba(0, 212, 255, 0.7);
+                transform: scale(0.8);
+                opacity: 0.4;
             }
-
-            70% {
-                transform: scale(1.05);
-                box-shadow: 0 0 0 10px rgba(0, 212, 255, 0);
+            50% {
+                transform: scale(1.3);
+                opacity: 1;
             }
-
             100% {
-                transform: scale(1);
-                box-shadow: 0 0 0 0 rgba(0, 212, 255, 0);
+                transform: scale(0.8);
+                opacity: 0.4;
             }
         }
 
-        .active-update {
-            animation: pulse 0.5s ease-out;
-        }
-
-        #log-panel {
-            grid-column: 1 / -1;
-            text-align: left;
-            max-height: 200px;
-            overflow-y: auto;
+        /* Real-time Event Console (Clean layout) */
+        .log-console {
+            background-color: #0f0f11;
+            border-radius: 6px;
+            padding: 12px;
             font-family: monospace;
-            font-size: 0.9rem;
-            color: #aaa;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            max-height: 180px;
+            overflow-y: auto;
+            border: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
         }
 
-        .log-entry {
-            margin: 2px 0;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        .log-row {
+            display: flex;
+            gap: 12px;
+            line-height: 1.4;
+        }
+
+        .log-time {
+            color: var(--text-muted);
+            min-width: 70px;
+        }
+
+        .log-msg {
+            color: var(--text-primary);
+        }
+
+        .log-accent {
+            color: var(--accent-blue);
         }
     </style>
 </head>
@@ -183,72 +373,125 @@
 <body>
 
     <header>
-        <h1>S.A.R.A. Vision Control</h1>
-        <div style="margin-top: 5px; font-size: 0.8rem; color: #666;">Distributed Actuation System • Team 313</div>
+        <div class="header-title-group">
+            <h1>S.A.R.A. Dashboard</h1>
+            <div class="header-subtitle">Distributed Tracking & Actuation System • Team 313</div>
+        </div>
+        <div id="conn-badge" class="connection-indicator">
+            <span id="conn-dot" class="status-dot"></span>
+            <span id="conn-text">DISCONNECTED</span>
+        </div>
     </header>
 
     <div class="container">
-        <!-- Face Picture Card -->
-        <div class="card">
-            <h2>Face Picture</h2>
-            <div id="face-container"
-                style="display: flex; justify-content: center; align-items: center; min-height: 200px;">
-                <img id="face-image" src="" alt="No face detected"
-                    style="max-width: 100%; max-height: 300px; border-radius: 8px; display: none; border: 2px solid var(--accent-color);" />
-                <div id="no-face-msg" style="color: #666; font-size: 1rem;">Waiting for face...</div>
+        <!-- Persistent Target Face Card -->
+        <div class="card col-4">
+            <div class="card-title">Target Snapshot</div>
+            <div class="face-box-wrapper">
+                <img id="face-image" src="" alt="Target Portrait" />
+                <div id="no-face-msg" class="placeholder-text">No target snapshot persisted</div>
+                <div id="face-overlay" class="face-overlay">
+                    <button class="btn-download" id="btn-download">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                        Download Image
+                    </button>
+                </div>
             </div>
         </div>
 
-        <!-- Movement Status Card -->
-        <div class="card">
-            <h2>Tracking Status</h2>
-            <div id="movement-status" class="value">WAITING...</div>
-            <div id="target-info" style="font-size: 1.2rem; color: #aaa; margin-top: 10px;">Target: --</div>
-            <div id="lock-status" class="status-badge" style="background: #333; color: #888; margin-top: 5px;">SEARCHING
+        <!-- Tracking Status Card -->
+        <div class="card col-4">
+            <div class="card-title">Tracking State</div>
+            <div id="movement-status" class="metric-value">WAITING</div>
+            <div id="lock-badge-container" style="margin-bottom: 12px;">
+                <span id="lock-badge" class="badge badge-searching">
+                    <span class="badge-dot"></span>
+                    <span id="lock-text">Searching</span>
+                </span>
             </div>
-            <div id="confidence" style="font-size: 0.9rem; color: #666; margin-top: 5px;">Confidence: --</div>
+            <div class="metric-sub" id="target-info">Active Target: --</div>
+            <div class="metric-sub" id="confidence-info" style="margin-top: 4px;">Match Confidence: --</div>
         </div>
 
-        <!-- System State Card -->
-        <div class="card">
-            <h2>System Connection</h2>
-            <div id="connection-status" class="status-badge disconnected">Disconnected</div>
-            <div id="timestamp" class="value" style="margin-top: 20px;">--:--:--</div>
+        <!-- System Metrics Card -->
+        <div class="card col-4">
+            <div class="card-title">System Metrics</div>
+            <div class="metric-value" id="system-time">--:--:--</div>
+            <div class="metric-sub" id="heartbeat-info">Last Heartbeat: Never</div>
+            <div class="metric-sub" style="margin-top: 4px;" id="latency-info">Node Latency: --</div>
         </div>
 
-        <!-- Log Panel -->
-        <div class="card" id="log-panel">
-            <h2>Event Log</h2>
-            <div id="logs"></div>
+        <!-- Flat Terminal Logs -->
+        <div class="card col-12">
+            <div class="card-title">System Event Console</div>
+            <div class="log-console" id="log-console">
+                <!-- Log rows dynamically injected -->
+            </div>
         </div>
     </div>
 
     <script>
-        // Connect to Backend running on PC
-        const wsUrl = `ws://10.11.74.50:9002`;
+        // Use current page domain if running on VPS, fallback to local test IP
+        const brokerIP = window.location.hostname || "10.11.72.183";
+        const wsUrl = `ws://${brokerIP}:9002`;
         let ws;
 
-        const statusEl = document.getElementById('movement-status');
-        const connEl = document.getElementById('connection-status');
-        const timeEl = document.getElementById('timestamp');
-        const confEl = document.getElementById('confidence');
-        const logsEl = document.getElementById('logs');
+        const faceImageEl = document.getElementById('face-image');
+        const noFaceMsgEl = document.getElementById('no-face-msg');
+        const faceOverlayEl = document.getElementById('face-overlay');
+        const downloadBtnEl = document.getElementById('btn-download');
+        
+        const movementEl = document.getElementById('movement-status');
+        const lockBadge = document.getElementById('lock-badge');
+        const lockText = document.getElementById('lock-text');
+        const targetEl = document.getElementById('target-info');
+        const confidenceEl = document.getElementById('confidence-info');
+        
+        const timeEl = document.getElementById('system-time');
+        const heartbeatEl = document.getElementById('heartbeat-info');
+        const connBadge = document.getElementById('conn-badge');
+        const connDot = document.getElementById('conn-dot');
+        const connText = document.getElementById('conn-text');
+        
+        const logsContainer = document.getElementById('log-console');
+
+        // Restore image from local storage on load (persistence)
+        function hydratePersistedImage() {
+            const persistedImage = localStorage.getItem('last_face_image');
+            if (persistedImage) {
+                faceImageEl.src = persistedImage;
+                faceImageEl.style.display = 'block';
+                noFaceMsgEl.style.display = 'none';
+                faceOverlayEl.classList.add('active');
+            }
+        }
+
+        // Configure Manual Download Button
+        downloadBtnEl.onclick = () => {
+            if (faceImageEl.src && faceImageEl.src.startsWith('data:')) {
+                const link = document.createElement('a');
+                link.download = 'sara_target_face.jpg';
+                link.href = faceImageEl.src;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                addLogRow("Manual snapshot download triggered.");
+            }
+        };
 
         function connect() {
             ws = new WebSocket(wsUrl);
 
             ws.onopen = () => {
-                console.log('Connected to Backend');
-                connEl.textContent = 'CONNECTED';
-                connEl.className = 'status-badge connected';
-                addLog('System connected to backend.');
+                connDot.className = 'status-dot active';
+                connText.textContent = 'CONNECTED';
+                addLogRow("Established connection to WebSocket relay server.", "SYSTEM");
             };
 
             ws.onclose = () => {
-                console.log('Disconnected');
-                connEl.textContent = 'DISCONNECTED';
-                connEl.className = 'status-badge disconnected';
-                addLog('Connection lost. Reconnecting...');
+                connDot.className = 'status-dot inactive';
+                connText.textContent = 'DISCONNECTED';
+                addLogRow("WebSocket connection terminated. Retrying in 3 seconds...", "WARNING");
                 setTimeout(connect, 3000);
             };
 
@@ -256,103 +499,117 @@
                 try {
                     const data = JSON.parse(event.data);
 
-                    // Handle STATUS messages
                     if (data.type === 'STATUS') {
-                        addLog(data.message);
+                        addLogRow(data.message, "INFO");
                         return;
                     }
 
-                    // Handle MQTT Movement messages
-                    // Expected: { "status": "MOVE_LEFT", "confidence": 0.9, "timestamp": ... }
                     if (data.status) {
-                        updateDashboard(data);
+                        updateState(data);
                     }
                 } catch (e) {
-                    console.log('Non-JSON message:', event.data);
+                    console.warn('Unknown format:', event.data);
                 }
             };
         }
 
-        const targetEl = document.getElementById('target-info');
-        const lockEl = document.getElementById('lock-status');
-        const faceImageEl = document.getElementById('face-image');
-        const noFaceMsgEl = document.getElementById('no-face-msg');
-
-        function updateDashboard(data) {
-            statusEl.textContent = data.status;
-
-            // Update Target Info
-            if (data.target) targetEl.textContent = `Target: ${data.target}`;
-
-            // Update Face Image - only update if new image received
-            if (data.face_image) {
-                //download image
-                try{
-                function downloadURI(uri, name) {
-                    var link = document.createElement('a');
-                    link.download = name;
-                    link.href = uri;
-                    document.body.appendChild(link);
-                    link.click();
-                    document.body.removeChild(link);
-                }
-            }catch(e){
-                console.log(e);
+        function updateState(data) {
+            // Update movement display
+            movementEl.textContent = data.status;
+            
+            // Subtle, professional color assignments
+            if (data.status === 'MOVE_LEFT') {
+                movementEl.style.color = 'var(--accent-red)';
+            } else if (data.status === 'MOVE_RIGHT') {
+                movementEl.style.color = 'var(--accent-blue)';
+            } else if (data.status === 'CENTERED') {
+                movementEl.style.color = 'var(--accent-green)';
+            } else {
+                movementEl.style.color = 'var(--text-muted)';
             }
-                downloadURI('data:image/jpeg;base64,' + data.face_image, 'face.jpg');
-                faceImageEl.src = 'data:image/jpeg;base64,' + data.face_image;
+
+            // Update lock pill tags
+            if (data.locked) {
+                if (data.status === 'CENTERED') {
+                    lockText.textContent = "Centered";
+                    lockBadge.className = "badge badge-centered";
+                } else {
+                    lockText.textContent = "Locked";
+                    lockBadge.className = "badge badge-locked";
+                }
+            } else {
+                lockText.textContent = "Searching";
+                lockBadge.className = "badge badge-searching";
+            }
+
+            // Update metrics details
+            if (data.target) targetEl.textContent = `Active Target: ${data.target}`;
+            if (data.confidence !== undefined) {
+                confidenceEl.textContent = `Match Confidence: ${(data.confidence * 100).toFixed(1)}%`;
+            }
+
+            // Persistence logic: Handle Face Image
+            if (data.face_image) {
+                const b64Data = 'data:image/jpeg;base64,' + data.face_image;
+                faceImageEl.src = b64Data;
                 faceImageEl.style.display = 'block';
                 noFaceMsgEl.style.display = 'none';
-            }
-            // Only clear image when target is lost (not locked)
+                faceOverlayEl.classList.add('active');
+                
+                // Save to localStorage
+                localStorage.setItem('last_face_image', b64Data);
+                addLogRow(`Persisted new portrait crop for target "${data.target}"`, "IMAGE");
+            } 
             else if (!data.locked) {
+                // Clear persistence if target is lost/unlocked completely
                 faceImageEl.style.display = 'none';
                 noFaceMsgEl.style.display = 'block';
-            }
-            // If locked but no new image, keep showing existing image
-
-            // Update Lock Status
-            if (data.locked) {
-                lockEl.textContent = "LOCKED";
-                lockEl.style.background = "rgba(0, 255, 157, 0.2)";
-                lockEl.style.color = "#00ff9d";
-                lockEl.style.border = "1px solid #00ff9d";
-            } else {
-                lockEl.textContent = "SEARCHING";
-                lockEl.style.background = "rgba(255, 165, 0, 0.2)";
-                lockEl.style.color = "orange";
-                lockEl.style.border = "1px solid orange";
+                faceOverlayEl.classList.remove('active');
+                localStorage.removeItem('last_face_image');
             }
 
-            // Visual feedback based on status
-            if (data.status === 'MOVE_LEFT') {
-                statusEl.style.color = '#ff0055'; // Red
-            } else if (data.status === 'MOVE_RIGHT') {
-                statusEl.style.color = '#00d4ff'; // Blue
-            } else if (data.status === 'CENTERED') {
-                statusEl.style.color = '#00ff9d'; // Green
-            } else {
-                statusEl.style.color = '#888';
+            // Update metric time
+            if (data.timestamp) {
+                const date = new Date(data.timestamp * 1000);
+                timeEl.textContent = date.toLocaleTimeString();
+                heartbeatEl.textContent = `Last Packet: ${new Date().toLocaleTimeString()}`;
+                
+                const latency = Date.now() - (data.timestamp * 1000);
+               document.getElementById('latency-info').textContent = `Node Latency: ${Math.max(0, latency)}ms`;
+
             }
-
-            statusEl.parentElement.classList.remove('active-update');
-            void statusEl.parentElement.offsetWidth; // Trigger reflow
-            statusEl.parentElement.classList.add('active-update');
-
-            if (data.confidence) confEl.textContent = `Confidence: ${(data.confidence * 100).toFixed(1)}%`;
-
-            const date = new Date();
-            timeEl.textContent = date.toLocaleTimeString();
         }
 
-        function addLog(msg) {
-            const entry = document.createElement('div');
-            entry.className = 'log-entry';
-            entry.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
-            logsEl.insertBefore(entry, logsEl.firstChild);
+        function addLogRow(message, level = "DEBUG") {
+            const row = document.createElement('div');
+            row.className = 'log-row';
+            
+            const timeSpan = document.createElement('span');
+            timeSpan.className = 'log-time';
+            timeSpan.textContent = new Date().toLocaleTimeString();
+            
+            const msgSpan = document.createElement('span');
+            msgSpan.className = 'log-msg';
+            
+            if (level !== "DEBUG") {
+                msgSpan.innerHTML = `[<span class="log-accent">${level}</span>] ${message}`;
+            } else {
+                msgSpan.textContent = message;
+            }
+            
+            row.appendChild(timeSpan);
+            row.appendChild(msgSpan);
+            
+            logsContainer.insertBefore(row, logsContainer.firstChild);
+            
+            // Limit log storage
+            if (logsContainer.children.length > 50) {
+                logsContainer.removeChild(logsContainer.lastChild);
+            }
         }
 
-        // Init
+        // Initialize
+        hydratePersistedImage();
         connect();
     </script>
 </body>
